@@ -27,11 +27,20 @@ export function loadTheme(): ThemeSetting {
   }
 }
 
-/** 端末に保存する（列1）。保存できない環境でも動きは変えない。 */
-export function saveTheme(theme: Theme): void {
+/**
+ * 端末に保存する（列1）。null は「OS に合わせる」なので、保存そのものを消す（列2）。
+ * 保存できない環境でも動きは変えない。
+ */
+export function saveTheme(setting: ThemeSetting): void {
   try {
-    localStorage.setItem(STORAGE_KEY, theme);
+    if (setting === null) localStorage.removeItem(STORAGE_KEY);
+    else localStorage.setItem(STORAGE_KEY, setting);
   } catch {
     // 保存できなくても表示は切り替える
   }
+}
+
+/** 画面に反映する。色は src/index.css の変数で切り替わる。 */
+export function applyTheme(theme: Theme): void {
+  document.documentElement.classList.toggle('dark', theme === 'dark');
 }
