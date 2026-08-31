@@ -1,0 +1,69 @@
+@import 'tailwindcss';
+
+/* テーマは端末の設定ではなく <html class="dark"> で切り替える（決定表「表示設定と共通の振る舞い」列1・列2） */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: 'BIZ UDPGothic', system-ui, sans-serif;
+}
+
+/*
+ * 配色はワイヤーフレーム（design/wireframes.html）を正とする。
+ * 値は変数で持ち、ダークは同じ名前で置き換える。画面側では dark: を書かずに済ませ、
+ * 見た目のずれが1か所に集まるようにする。
+ * 文字と地の対比は src/lib/contrast.test.ts が数える（決定表「表示設定と共通の振る舞い」列7）。
+ */
+:root {
+  --c-paper: #f5f8fc; /* 画面の地 */
+  --c-panel: #ffffff; /* カード・ペインの地 */
+  --c-subtle: #e8eef7; /* 見出しの帯・表のヘッダ */
+  --c-hover: #d3e0f2; /* 白抜きボタンにカーソルを乗せたとき */
+  --c-ink: #132a45; /* 文字と主要な枠線・主ボタンの地 */
+  --c-ink-hover: #0d1e33;
+  --c-ink-soft: #42566e; /* 補助の文字 */
+  --c-muted: #566779; /* 注記 */
+  --c-line: #c2cfdf; /* 細い区切り線 */
+  --c-edge: #7a8da5; /* 副ボタンの枠線 */
+  --c-link: #14559c;
+
+  --c-income: #0f6b5f; /* 収入 */
+  --c-expense: #b42318; /* 支出・予算超過 */
+  --c-warn: #b42318;
+  --c-warn-panel: #fef3f2;
+  --c-shared: #3f4fa8; /* 共有範囲がグループであることの印 */
+  --c-shared-panel: #e8ebfa;
+  --c-own: #6b4b12; /* 共有範囲が個人であることの印 */
+  --c-own-panel: #fdf3e3;
+  --c-bar: #4a6fa5; /* 棒グラフ・予算バー */
+  --c-bar-track: #dde7f5;
+}
+
+.dark {
+  --c-paper: #0f1823;
+  --c-panel: #17212e;
+  --c-subtle: #1e2a39;
+  --c-hover: #28374a;
+  --c-ink: #e9eff7;
+  --c-ink-hover: #ffffff;
+  --c-ink-soft: #adbccf;
+  --c-muted: #8d9db1;
+  --c-line: #33455a;
+  --c-edge: #5d7288;
+  --c-link: #8ab8f0;
+
+  --c-income: #5fd3bd;
+  --c-expense: #ff9478;
+  --c-warn: #ff9478;
+  --c-warn-panel: #3a1c16;
+  --c-shared: #a8b4f5;
+  --c-shared-panel: #232a4a;
+  --c-own: #e5c48a;
+  --c-own-panel: #3a2f1a;
+  --c-bar: #7fa6dd;
+  --c-bar-track: #24354a;
+}
+
+body {
+  background: var(--c-paper);
+  color: var(--c-ink);
+}

@@ -1,0 +1,544 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>家計簿 ワイヤーフレーム</title>
+    <style>
+      /*
+       * 画面の見た目はこのファイルを正とする（docs/仕様書.md §6）。
+       * 配色の変数名と値は src/index.css と同じものを使う。ここを直したら向こうも直す。
+       */
+      :root {
+        --c-paper: #f5f8fc;
+        --c-panel: #ffffff;
+        --c-subtle: #e8eef7;
+        --c-hover: #d3e0f2;
+        --c-ink: #132a45;
+        --c-ink-soft: #42566e;
+        --c-muted: #566779;
+        --c-line: #c2cfdf;
+        --c-edge: #7a8da5;
+        --c-link: #14559c;
+        --c-income: #0f6b5f;
+        --c-expense: #b42318;
+        --c-warn: #b42318;
+        --c-warn-panel: #fef3f2;
+        --c-shared: #3f4fa8;
+        --c-shared-panel: #e8ebfa;
+        --c-own: #6b4b12;
+        --c-own-panel: #fdf3e3;
+        --c-bar: #4a6fa5;
+        --c-bar-track: #dde7f5;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #e2e8f0;
+        color: var(--c-ink);
+        font-family: 'BIZ UDPGothic', system-ui, sans-serif;
+        font-size: 13px;
+        line-height: 1.6;
+      }
+      h1 { font-size: 20px; margin: 0 0 4px; }
+      body > p { margin: 0 0 24px; color: #334155; max-width: 70ch; }
+      .gallery { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+
+      .frame { background: var(--c-paper); border: 1px solid var(--c-edge); border-radius: 10px; overflow: hidden; }
+      .frame.mobile { width: 375px; }
+      .frame.wide { width: 720px; }
+      .frame > .caption {
+        background: var(--c-ink); color: var(--c-paper); padding: 6px 10px;
+        font-size: 12px; display: flex; justify-content: space-between; gap: 8px;
+      }
+      .caption .ref { color: #b9cbe4; font-weight: normal; }
+      .body { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+
+      .bar { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+             background: var(--c-panel); border: 1px solid var(--c-line); border-radius: 8px; padding: 8px 10px; }
+      .card { background: var(--c-panel); border: 1px solid var(--c-line); border-radius: 8px; padding: 10px; }
+      .card > h3 { margin: 0 0 8px; font-size: 13px; }
+      .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+      .row + .row { border-top: 1px dashed var(--c-line); padding-top: 6px; margin-top: 6px; }
+      .col { display: flex; flex-direction: column; gap: 6px; }
+      .grow { flex: 1; }
+
+      .field { display: flex; flex-direction: column; gap: 3px; }
+      .field > label { font-size: 11px; color: var(--c-muted); }
+      .input { border: 1px solid var(--c-edge); border-radius: 6px; background: var(--c-panel);
+               padding: 6px 8px; min-height: 30px; display: flex; align-items: center; }
+      .input.placeholder { color: var(--c-muted); }
+      .btn { border: 1px solid var(--c-ink); background: var(--c-ink); color: var(--c-paper);
+             border-radius: 6px; padding: 6px 12px; text-align: center; }
+      .btn.ghost { background: var(--c-panel); color: var(--c-ink); border-color: var(--c-edge); }
+      .btn.small { padding: 3px 8px; font-size: 11px; }
+      .tabs { display: flex; gap: 4px; }
+      .tab { border: 1px solid var(--c-edge); border-radius: 999px; padding: 3px 10px; font-size: 11px; background: var(--c-panel); }
+      .tab.on { background: var(--c-ink); color: var(--c-paper); border-color: var(--c-ink); }
+
+      .tag { border-radius: 999px; padding: 1px 8px; font-size: 11px; white-space: nowrap; }
+      .tag.shared { background: var(--c-shared-panel); color: var(--c-shared); }
+      .tag.own { background: var(--c-own-panel); color: var(--c-own); }
+      .amount { font-variant-numeric: tabular-nums; }
+      .expense { color: var(--c-expense); }
+      .income { color: var(--c-income); }
+      .muted { color: var(--c-muted); font-size: 11px; }
+      .warn { color: var(--c-warn); }
+      .warnbox { background: var(--c-warn-panel); border: 1px solid var(--c-warn); color: var(--c-warn);
+                 border-radius: 6px; padding: 6px 8px; font-size: 11px; }
+
+      .meter { height: 8px; background: var(--c-bar-track); border-radius: 999px; overflow: hidden; }
+      .meter > span { display: block; height: 100%; background: var(--c-bar); }
+      .meter.over > span { background: var(--c-warn); }
+
+      table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      th { background: var(--c-subtle); color: var(--c-ink-soft); font-weight: normal; text-align: left; }
+      th, td { border: 1px solid var(--c-line); padding: 4px 6px; }
+      td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+      .note { font-size: 11px; color: var(--c-muted); border-left: 3px solid var(--c-edge);
+              padding: 2px 8px; background: var(--c-panel); }
+      .nav { display: flex; justify-content: space-around; border-top: 1px solid var(--c-line);
+             background: var(--c-panel); padding: 6px 0; font-size: 11px; color: var(--c-muted); }
+      .nav .on { color: var(--c-ink); font-weight: bold; }
+      .chart { display: flex; align-items: flex-end; gap: 6px; height: 90px; }
+      .chart > div { flex: 1; background: var(--c-bar); border-radius: 3px 3px 0 0; }
+      .donut { width: 92px; height: 92px; border-radius: 50%;
+               background: conic-gradient(var(--c-bar) 0 42%, #7fa6dd 42% 68%, #b9cbe4 68% 86%, var(--c-bar-track) 86% 100%); }
+    </style>
+  </head>
+  <body>
+    <h1>家計簿 ワイヤーフレーム</h1>
+    <p>
+      画面の構成は docs/仕様書.md §6、振る舞いは spec/tables/*.jsonl を正とする。ここで決めるのは配置と情報の優先順位だけ。
+      スマートフォンでの入力を主用途とするため、入力に関わる画面はモバイル幅で描く。表を並べる画面だけ広い幅も置く。
+      配色の変数は src/index.css と同じ。
+    </p>
+
+    <div class="gallery">
+      <!-- ============================================ ログイン -->
+      <section class="frame mobile">
+        <div class="caption"><span>ログイン</span><span class="ref">決定表「認証」</span></div>
+        <div class="body">
+          <div style="height: 40px"></div>
+          <div class="card col">
+            <h3>家計簿</h3>
+            <div class="field"><label>メールアドレス</label><div class="input placeholder">you@example.com</div></div>
+            <div class="field"><label>パスワード</label><div class="input placeholder">••••••••</div></div>
+            <div class="btn">ログイン</div>
+            <div class="warnbox">メールアドレスまたはパスワードが違います</div>
+            <div class="note">サインアップ導線は置かない。アカウントは管理画面から手で作る（§2.3）</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ ホーム -->
+      <section class="frame mobile">
+        <div class="caption"><span>ホーム</span><span class="ref">§5.5 / §5.6</span></div>
+        <div class="body">
+          <div class="bar"><span>◀</span><strong>2026年8月</strong><span>▶</span></div>
+
+          <div class="card col">
+            <div class="row"><span>収入</span><span class="amount income">+320,000</span></div>
+            <div class="row"><span>支出</span><span class="amount expense">−214,800</span></div>
+            <div class="row"><strong>収支</strong><strong class="amount">+105,200</strong></div>
+            <div class="muted">負担額で見た自分の分。前月比 +12,300</div>
+          </div>
+
+          <div class="card col">
+            <h3>予算</h3>
+            <div class="col">
+              <div class="row"><span><span class="tag shared">夫婦</span> 家賃</span><span class="amount">120,000 / 120,000</span></div>
+              <div class="meter"><span style="width: 100%"></span></div>
+            </div>
+            <div class="col">
+              <div class="row"><span><span class="tag shared">夫婦</span> 食費</span><span class="amount warn">62,400 / 55,000</span></div>
+              <div class="meter over"><span style="width: 100%"></span></div>
+              <div class="muted warn">7,400 超過</div>
+            </div>
+            <div class="col">
+              <div class="row"><span><span class="tag own">個人</span> 交際費</span><span class="amount">8,200 / 20,000</span></div>
+              <div class="meter"><span style="width: 41%"></span></div>
+            </div>
+          </div>
+
+          <div class="card col">
+            <h3>直近の取引</h3>
+            <div class="row">
+              <span><span class="tag shared">夫婦</span> 食費 <span class="muted">はなこ</span></span>
+              <span class="amount expense">−4,200</span>
+            </div>
+            <div class="row">
+              <span><span class="tag shared">夫婦</span> 家賃 <span class="muted">共用</span></span>
+              <span class="amount expense">−120,000</span>
+            </div>
+            <div class="row">
+              <span><span class="tag own">個人</span> 食費 <span class="muted">たかし</span></span>
+              <span class="amount expense">−780</span>
+            </div>
+          </div>
+
+          <div class="btn">＋ 取引を入力</div>
+        </div>
+        <div class="nav"><span class="on">ホーム</span><span>入力</span><span>一覧</span><span>集計</span><span>予算</span></div>
+      </section>
+
+      <!-- ============================================ 取引入力 -->
+      <section class="frame mobile">
+        <div class="caption"><span>取引入力</span><span class="ref">決定表「取引の入力と編集」</span></div>
+        <div class="body">
+          <div class="tabs"><span class="tab on">支出</span><span class="tab">収入</span></div>
+
+          <div class="field"><label>日付</label><div class="input">2026-08-31</div></div>
+
+          <div class="field">
+            <label>カテゴリ（共有範囲はカテゴリが決める）</label>
+            <div class="input"><span class="tag shared">夫婦</span>&nbsp;食費</div>
+          </div>
+
+          <div class="field"><label>金額</label><div class="input amount" style="font-size: 20px">4,200</div></div>
+
+          <div class="field">
+            <label>支払者</label>
+            <div class="tabs"><span class="tab">たかし</span><span class="tab on">はなこ</span><span class="tab">共用</span></div>
+          </div>
+
+          <div class="card col">
+            <div class="row"><h3 style="margin: 0">負担</h3><span class="btn ghost small">既定に戻す</span></div>
+            <div class="row"><span>たかし</span><span class="input amount" style="width: 96px">2,100</span></div>
+            <div class="row"><span>はなこ</span><span class="input amount" style="width: 96px">2,100</span></div>
+            <div class="row"><span class="muted">合計</span><span class="muted amount">4,200 / 4,200</span></div>
+            <div class="note">既定は共有グループの負担割合で按分する。手で直すと以後は自動で戻さない（§5.1）</div>
+          </div>
+
+          <div class="field"><label>備考</label><div class="input placeholder">スーパー</div></div>
+
+          <div class="row">
+            <div class="btn ghost grow">保存して続けて入力</div>
+            <div class="btn grow">保存</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ 負担の警告 / カテゴリ選択 -->
+      <section class="frame mobile">
+        <div class="caption"><span>カテゴリ選択・負担の警告</span><span class="ref">§5.1 / §6</span></div>
+        <div class="body">
+          <div class="card col">
+            <h3>カテゴリを選ぶ</h3>
+            <div class="muted">よく使う</div>
+            <div class="row"><span><span class="tag shared">夫婦</span> 食費</span><span class="muted">▸</span></div>
+            <div class="row"><span><span class="tag own">個人</span> 食費</span><span class="muted">▸</span></div>
+            <div class="muted" style="margin-top: 8px">夫婦</div>
+            <div class="row"><span>家賃</span><span class="muted">▸</span></div>
+            <div class="row"><span>水道光熱費</span><span class="muted">▸</span></div>
+            <div class="row"><span>未分類</span><span class="muted">▸</span></div>
+            <div class="muted" style="margin-top: 8px">個人</div>
+            <div class="row"><span>交際費</span><span class="muted">▸</span></div>
+            <div class="note">同じ名前でも共有範囲が違えば別のカテゴリ。範囲つきで並べる（§2.4）</div>
+          </div>
+
+          <div class="card col">
+            <h3>負担の合計が合わないとき</h3>
+            <div class="row"><span>たかし</span><span class="input amount" style="width: 96px">3,000</span></div>
+            <div class="row"><span>はなこ</span><span class="input amount" style="width: 96px">1,000</span></div>
+            <div class="warnbox">合計 4,000 が金額 4,200 と一致しません（200 足りません）</div>
+            <div class="row">
+              <span class="btn ghost small">はなこに残りを入れる</span>
+              <span class="btn small" style="opacity: 0.4">保存</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ 取引一覧 -->
+      <section class="frame wide">
+        <div class="caption"><span>取引一覧</span><span class="ref">§6 / 決定表「取引の入力と編集」</span></div>
+        <div class="body">
+          <div class="bar">
+            <span>◀ <strong>2026年8月</strong> ▶</span>
+            <span class="tabs"><span class="tab on">すべて</span><span class="tab">夫婦</span><span class="tab">個人</span></span>
+            <span class="input placeholder grow" style="max-width: 200px">キーワードで絞る</span>
+          </div>
+          <table>
+            <tr><th>日付</th><th>共有範囲</th><th>カテゴリ</th><th>支払者</th><th>負担</th><th style="text-align: right">金額</th><th>備考</th><th></th></tr>
+            <tr>
+              <td>08-31</td><td><span class="tag shared">夫婦</span></td><td>家賃</td><td>共用</td>
+              <td class="muted">60,000 / 60,000</td><td class="num expense">120,000</td><td>8月分</td><td class="muted">…</td>
+            </tr>
+            <tr>
+              <td>08-31</td><td><span class="tag shared">夫婦</span></td><td>食費</td><td>はなこ</td>
+              <td class="muted">2,100 / 2,100</td><td class="num expense">4,200</td><td>まとめ買い</td><td class="muted">…</td>
+            </tr>
+            <tr>
+              <td>08-31</td><td><span class="tag own">個人</span></td><td>食費</td><td>たかし</td>
+              <td class="muted">780</td><td class="num expense">780</td><td>昼食</td><td class="muted">…</td>
+            </tr>
+            <tr>
+              <td>08-25</td><td><span class="tag shared">夫婦</span></td><td>給与</td><td>たかし</td>
+              <td class="muted">320,000</td><td class="num income">320,000</td><td></td><td class="muted">…</td>
+            </tr>
+          </table>
+          <div class="row">
+            <span class="muted">2件を選択中</span>
+            <span class="row" style="gap: 6px">
+              <span class="btn ghost small">カテゴリを付け替える</span>
+              <span class="btn ghost small warn">削除</span>
+            </span>
+          </div>
+          <div class="note">負担の列は「自分 / 相手」。共用払いも支払者の欄に出す（§5.4）</div>
+        </div>
+      </section>
+
+      <!-- ============================================ 集計 -->
+      <section class="frame wide">
+        <div class="caption"><span>集計</span><span class="ref">§5.4 / §5.5</span></div>
+        <div class="body">
+          <div class="bar">
+            <span>◀ <strong>2026年8月</strong> ▶</span>
+            <span>
+              対象範囲
+              <span class="tabs" style="display: inline-flex">
+                <span class="tab on">自分に関わるすべて</span><span class="tab">夫婦</span><span class="tab">個人</span>
+              </span>
+            </span>
+            <span>
+              集計基準
+              <span class="tabs" style="display: inline-flex">
+                <span class="tab on">負担額</span><span class="tab">支払額</span>
+              </span>
+            </span>
+          </div>
+
+          <div class="row" style="align-items: stretch">
+            <div class="card col grow">
+              <h3>カテゴリ別の内訳</h3>
+              <div class="row">
+                <div class="donut"></div>
+                <div class="col grow">
+                  <div class="row"><span><span class="tag shared">夫婦</span> 家賃</span><span class="amount">60,000</span></div>
+                  <div class="row"><span><span class="tag shared">夫婦</span> 食費</span><span class="amount">31,200</span></div>
+                  <div class="row"><span><span class="tag own">個人</span> 食費</span><span class="amount">12,400</span></div>
+                  <div class="row"><span><span class="tag own">個人</span> 交際費</span><span class="amount">8,200</span></div>
+                </div>
+              </div>
+              <div class="note">名前が同じでも共有範囲が違えば別の行（§5.4）</div>
+            </div>
+
+            <div class="card col grow">
+              <h3>月次の推移</h3>
+              <div class="chart">
+                <div style="height: 40%"></div><div style="height: 55%"></div><div style="height: 48%"></div>
+                <div style="height: 72%"></div><div style="height: 60%"></div><div style="height: 88%"></div>
+              </div>
+              <div class="muted">3月 … 8月／支出合計</div>
+              <div class="row"><span>前月比</span><span class="amount warn">+12,300</span></div>
+            </div>
+          </div>
+
+          <div class="card col">
+            <h3>人別</h3>
+            <div class="row"><span>たかし</span><span class="amount">118,900</span></div>
+            <div class="row"><span>はなこ</span><span class="amount">95,900</span></div>
+            <div class="row"><span>共用 <span class="muted">（支払額で見たときだけ出る枠）</span></span><span class="amount">120,000</span></div>
+            <div class="note">脱退した人も、その範囲のデータに現れるなら並べる（§3.3）</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ 予算 -->
+      <section class="frame wide">
+        <div class="caption"><span>予算</span><span class="ref">§5.6 / 決定表「予算」</span></div>
+        <div class="body">
+          <div class="bar">
+            <span>◀ <strong>2026年8月</strong> ▶</span>
+            <span class="btn ghost small">前月の予算を複製</span>
+          </div>
+          <table>
+            <tr><th>共有範囲</th><th>カテゴリ</th><th style="text-align: right">予算</th><th style="text-align: right">実績</th><th style="text-align: right">残額</th><th style="width: 160px">消化</th><th style="text-align: right">自分の負担</th></tr>
+            <tr>
+              <td><span class="tag shared">夫婦</span></td><td>家賃</td>
+              <td class="num">120,000</td><td class="num">120,000</td><td class="num">0</td>
+              <td><div class="meter"><span style="width: 100%"></span></div></td><td class="num muted">60,000</td>
+            </tr>
+            <tr>
+              <td><span class="tag shared">夫婦</span></td><td>食費</td>
+              <td class="num">55,000</td><td class="num warn">62,400</td><td class="num warn">−7,400</td>
+              <td><div class="meter over"><span style="width: 100%"></span></div></td><td class="num muted">31,200</td>
+            </tr>
+            <tr>
+              <td><span class="tag shared">夫婦</span></td><td>水道光熱費</td>
+              <td class="num muted" colspan="4">予算なし</td><td class="num muted">9,400</td>
+            </tr>
+            <tr>
+              <td><span class="tag own">個人</span></td><td>交際費</td>
+              <td class="num">20,000</td><td class="num">8,200</td><td class="num">11,800</td>
+              <td><div class="meter"><span style="width: 41%"></span></div></td><td class="num muted">8,200</td>
+            </tr>
+            <tr>
+              <th colspan="2">夫婦の合計</th><th class="num">175,000</th><th class="num">182,400</th><th class="num">−7,400</th><th></th><th></th>
+            </tr>
+          </table>
+          <div class="note">
+            実績は集計基準に従わず、そのカテゴリの支出総額を使う。共同の枠が人数分に割れて意味を失うため（§5.6）。
+            自分の負担は参考値として右端に併記する
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ 共有グループ管理 -->
+      <section class="frame mobile">
+        <div class="caption"><span>共有グループ管理</span><span class="ref">決定表「共有グループの管理」</span></div>
+        <div class="body">
+          <div class="card col">
+            <div class="row"><h3 style="margin: 0">夫婦</h3><span class="btn ghost small">名前を変える</span></div>
+            <div class="row"><span>たかし</span><span class="row" style="gap: 6px"><span class="input amount" style="width: 44px">1</span><span class="muted">外す</span></span></div>
+            <div class="row"><span>はなこ</span><span class="row" style="gap: 6px"><span class="input amount" style="width: 44px">1</span><span class="muted">外す</span></span></div>
+            <div class="muted">負担割合。折半なら両方 1、7:3 なら 7 と 3</div>
+            <div class="btn ghost">＋ メンバーを追加</div>
+          </div>
+          <div class="card col">
+            <div class="row"><h3 style="margin: 0">家族全員</h3><span class="muted">3人</span></div>
+            <div class="muted">カテゴリ 4件・取引 128件</div>
+          </div>
+          <div class="btn ghost">＋ グループを作る</div>
+          <div class="note">
+            最後の1人は外せない（0人になると誰からも見えなくなる）。割合を変えても過去の取引の負担は変わらない
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ カテゴリ管理 -->
+      <section class="frame mobile">
+        <div class="caption"><span>カテゴリ管理</span><span class="ref">決定表「カテゴリの管理」</span></div>
+        <div class="body">
+          <div class="tabs"><span class="tab on">支出</span><span class="tab">収入</span></div>
+
+          <div class="card col">
+            <div class="row"><h3 style="margin: 0"><span class="tag shared">夫婦</span></h3><span class="btn ghost small">＋ 追加</span></div>
+            <div class="row"><span>⣿ 家賃</span><span class="muted">■ 編集</span></div>
+            <div class="row"><span>⣿ 食費</span><span class="muted">■ 編集</span></div>
+            <div class="row"><span>⣿ 水道光熱費</span><span class="muted">■ 編集</span></div>
+            <div class="row"><span class="muted">未分類（消せない）</span><span></span></div>
+          </div>
+
+          <div class="card col">
+            <div class="row"><h3 style="margin: 0"><span class="tag own">個人</span></h3><span class="btn ghost small">＋ 追加</span></div>
+            <div class="row"><span>⣿ 食費</span><span class="muted">■ 編集</span></div>
+            <div class="row"><span>⣿ 交際費 <span class="muted">アーカイブ済み</span></span><span class="muted">■ 編集</span></div>
+            <div class="row"><span class="muted">未分類（消せない）</span><span></span></div>
+          </div>
+
+          <div class="card col">
+            <h3>カテゴリを編集</h3>
+            <div class="field"><label>名前</label><div class="input">食費</div></div>
+            <div class="field"><label>色</label><div class="input">■ #4a6fa5</div></div>
+            <div class="field"><label>共有範囲・収支区分</label><div class="input muted">夫婦・支出（作成後は変えられない）</div></div>
+            <div class="row">
+              <span class="btn ghost small">別の共有範囲へ複製</span>
+              <span class="btn ghost small">アーカイブ</span>
+              <span class="btn ghost small warn">削除</span>
+            </div>
+            <div class="note">共有範囲を変えるには §5.2 の確認を通す。削除すると取引は同じ範囲の未分類へ移る</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ 共有範囲の変更 -->
+      <section class="frame mobile">
+        <div class="caption"><span>共有範囲の変更（確認）</span><span class="ref">§5.2</span></div>
+        <div class="body">
+          <div class="card col">
+            <h3>「個人 / 食費」を「夫婦」へ移す</h3>
+            <div class="row"><span>移る取引</span><span class="amount">42件・128,400円</span></div>
+            <div class="row"><span>負担を手で直した取引</span><span class="amount">3件</span></div>
+            <div class="warnbox">
+              移すと負担は夫婦の割合（1:1）で作り直されます。手で直した3件も既定に戻ります
+            </div>
+            <div class="row">
+              <span class="btn ghost grow">やめる</span>
+              <span class="btn grow">移す</span>
+            </div>
+          </div>
+
+          <div class="card col">
+            <h3>中止するとき</h3>
+            <div class="warnbox">移動先に同じ名前の「食費」があります</div>
+            <div class="row">
+              <span class="btn ghost small">そのカテゴリへ統合する</span>
+              <span class="btn ghost small">やめる</span>
+            </div>
+            <div class="muted">統合すると移動元のカテゴリと、その予算 1件 が消えます</div>
+            <div class="warnbox">
+              他の人が支払った取引が 5件 あるため、個人へは移せません
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ インポート -->
+      <section class="frame wide">
+        <div class="caption"><span>インポート</span><span class="ref">決定表「CSVインポート」</span></div>
+        <div class="body">
+          <div class="card col">
+            <div class="row"><span>取引.csv <span class="muted">128行</span></span><span class="btn ghost small">別のファイルを選ぶ</span></div>
+            <div class="row">
+              <span>未知のカテゴリ「日用品」<span class="muted">（12行）</span></span>
+              <span class="tabs"><span class="tab on">夫婦に作る</span><span class="tab">未分類にする</span></span>
+            </div>
+            <div class="row">
+              <span>すでにある取引と同じ内容 <span class="muted">（3行）</span></span>
+              <span class="tabs"><span class="tab">取り込む</span><span class="tab on">飛ばす</span></span>
+            </div>
+          </div>
+
+          <table>
+            <tr><th>行</th><th>日付</th><th>共有範囲</th><th>カテゴリ</th><th class="num">金額</th><th>支払者</th><th>負担</th><th>判定</th></tr>
+            <tr><td>2</td><td>2026-08-31</td><td>夫婦</td><td>家賃</td><td class="num">120,000</td><td>共用</td><td>60,000 / 60,000</td><td>取り込む</td></tr>
+            <tr><td>3</td><td>2026-08-31</td><td>夫婦</td><td>食費</td><td class="num">4,200</td><td>はなこ</td><td class="muted">空欄 → 按分</td><td>取り込む</td></tr>
+            <tr><td>4</td><td>2026-08-30</td><td>夫婦</td><td>食費</td><td class="num">4,200</td><td>はなこ</td><td class="muted">空欄 → 按分</td><td class="muted">重複・飛ばす</td></tr>
+            <tr><td>5</td><td class="warn">2026/08/29</td><td>夫婦</td><td>食費</td><td class="num">1,200</td><td>たかし</td><td></td><td class="warn">日付の書式</td></tr>
+            <tr><td>6</td><td>2026-08-28</td><td class="warn">単身赴任</td><td>食費</td><td class="num">900</td><td>たかし</td><td></td><td class="warn">グループが無い</td></tr>
+            <tr><td>7</td><td>2026-08-27</td><td>夫婦</td><td>食費</td><td class="num">3,000</td><td>たかし</td><td class="warn">2,000;500</td><td class="warn">負担の合計</td></tr>
+          </table>
+
+          <div class="row">
+            <span>成功 122 ／ 飛ばす 3 ／ エラー 3</span>
+            <span class="btn">122件を取り込む</span>
+          </div>
+          <div class="note">
+            全行を先に検証してから投入する。エラー行があっても正しい行は取り込む（§4.4）
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ エクスポート・設定 -->
+      <section class="frame mobile">
+        <div class="caption"><span>エクスポート・設定</span><span class="ref">§4.5 / §6</span></div>
+        <div class="body">
+          <div class="card col">
+            <h3>書き出す</h3>
+            <div class="row"><span>取引</span><span class="tabs"><span class="tab on">全期間</span><span class="tab">対象月</span></span></div>
+            <div class="row"><span>予算</span><span class="tabs"><span class="tab on">全期間</span><span class="tab">対象月</span></span></div>
+            <div class="row"><span>カテゴリ</span><span class="muted">期間の指定なし</span></div>
+            <div class="row"><span>共有グループ</span><span class="muted">期間の指定なし</span></div>
+            <div class="btn">選んだものを書き出す</div>
+            <div class="note">取り込めるのは取引だけ。他は控えのための書き出し（§4.3）</div>
+          </div>
+
+          <div class="card col">
+            <h3>設定</h3>
+            <div class="field"><label>表示名</label><div class="input">たかし</div></div>
+            <div class="field"><label>色</label><div class="input">■ #4a6fa5</div></div>
+            <div class="field"><label>入力時の既定カテゴリ</label><div class="input"><span class="tag shared">夫婦</span>&nbsp;食費</div></div>
+            <div class="row"><span>テーマ</span><span class="tabs"><span class="tab">OS に合わせる</span><span class="tab on">ライト</span><span class="tab">ダーク</span></span></div>
+            <div class="btn ghost">ログアウト</div>
+            <div class="note">表示名は CSV が人を指すのに使うため一意。`共用` `個人` `:` `;` は使えない（§3.1）</div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </body>
+</html>

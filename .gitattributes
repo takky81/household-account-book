@@ -1,0 +1,2 @@
+# 改行は LF に統一する。決定表の jsonl の差分を安定させるため。
+* text=auto eol=lf

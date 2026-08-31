@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  spec:
+    name: 決定表
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+      # jsonl がすべて読めること、決定表として矛盾がないことを確かめる。
+      # 列番号の重複や同じ列での行の重複があれば build が落ちる。
+      - name: 決定表を生成する
+        working-directory: spec
+        run: npm run build
+      # すべての列がテストで押さえられていることを確かめる。
+      # 実装はこれからなので、いまは落とさずに数字だけ出す。
+      # ユニットテストと E2E が揃ったら continue-on-error を外す。
+      - name: 決定表のカバレッジ
+        working-directory: spec
+        run: npm run coverage
+        continue-on-error: true
+
+  db:
+    name: データベース
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.116.0
+      # RLS と RPC の検査は pgTAP で行う（supabase/tests/*.test.sql）。
+      # マイグレーションが流れることも、ここで一緒に確かめている。
+      - name: ローカル Supabase を立ち上げる
+        run: supabase start
+      - name: DB のテスト
+        run: supabase test db
+      - name: 片づける
+        if: always()
+        run: supabase stop
+
+  app:
+    name: アプリ
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+      - run: npm ci
+      - name: 型を検査する
+        run: npm run typecheck
+      - name: ユニットテスト
+        run: npm test
+      - name: ビルド
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: http://127.0.0.1:54421
+          VITE_SUPABASE_ANON_KEY: dummy-for-build

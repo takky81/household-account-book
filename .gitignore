@@ -1,0 +1,42 @@
+# 依存パッケージ
+node_modules/
+
+# ビルド生成物
+dist/
+build/
+.vite/
+
+# 決定表の表示用HTML（jsonl から生成する）
+spec/dist/
+
+# デザインキャンバスの公開用ファイル（.dc.html と canvas.json から生成する）
+design/wireframes-preview.html
+
+# 環境変数（Supabase の URL / anon key）
+.env
+.env.*
+!.env.example
+
+# テスト成果物
+coverage/
+playwright-report/
+test-results/
+
+# エディタ
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+.playwright/
+
+# 決定表以外の作業メモ
+/scratch/
