@@ -20,6 +20,13 @@ export type TransactionInput = {
   /** 共有範囲のメンバー。個人カテゴリでは所有者1人だけ */
   memberIds: string[];
   splits: Split[];
+  /**
+   * 編集で、支払者が読み込んだときのままか。true のときは支払者がメンバーかどうかを見ない。
+   * DB の transactions_check_payer も値が実際に変わるときしか発火しないので、脱退した人が
+   * 支払者のままの取引でも備考だけを直せる（列11 / §3.5）。
+   * 負担の相手はいつでも今のメンバーでなければならない（DB の splits_check_member と同じ）。
+   */
+  payerUnchanged?: boolean;
 };
 
 export function validateTransaction(input: TransactionInput): Validation {
@@ -32,14 +39,16 @@ export function validateTransaction(input: TransactionInput): Validation {
   // 個人カテゴリの共有範囲のメンバーは所有者1人だけ（§3.6）
   const members = isPersonal && ownerId !== null ? [ownerId] : memberIds;
 
-  if (isPersonal) {
+  const checkPayer = input.payerUnchanged !== true;
+
+  if (isPersonal && checkPayer) {
     if (payerId === null) {
       return { ok: false, message: '個人カテゴリの支払者は本人だけです' };
     }
     if (payerId !== ownerId) {
       return { ok: false, message: '個人カテゴリの支払者は本人だけです' };
     }
-  } else if (payerId !== null && !members.includes(payerId)) {
+  } else if (checkPayer && payerId !== null && !members.includes(payerId)) {
     return { ok: false, message: '支払者がその共有グループのメンバーではありません' };
   }
 

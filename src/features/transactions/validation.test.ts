@@ -100,3 +100,42 @@ describe('validateTransaction', () => {
     expect(validateTransaction({ ...base, payerId: null })).toEqual({ ok: true });
   });
 });
+
+describe('編集のとき', () => {
+  it('列11 支払者が変わっていなければ、脱退した人が支払者のままでも保存できる', () => {
+    const result = validateTransaction({
+      ...base,
+      // u2 はもうメンバーではない。負担は今のメンバーだけで引き直されている
+      memberIds: ['u1'],
+      payerId: 'u2',
+      splits: [{ userId: 'u1', amount: 4200 }],
+      payerUnchanged: true,
+    });
+    expect(result).toEqual({ ok: true });
+  });
+
+  it('列5 支払者を変えるときは、変えた先のメンバーかどうかを見る', () => {
+    const result = validateTransaction({
+      ...base,
+      memberIds: ['u1'],
+      payerId: 'u2',
+      splits: [{ userId: 'u1', amount: 4200 }],
+      payerUnchanged: false,
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it('支払者が変わっていなくても、負担の相手は今のメンバーでなければならない', () => {
+    const result = validateTransaction({
+      ...base,
+      memberIds: ['u1'],
+      payerId: 'u2',
+      splits: [
+        { userId: 'u1', amount: 2100 },
+        { userId: 'u2', amount: 2100 },
+      ],
+      payerUnchanged: true,
+    });
+    expect(result.ok).toBe(false);
+  });
+});

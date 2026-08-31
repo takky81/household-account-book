@@ -33,6 +33,8 @@ export function TransactionFormPage() {
   const [payer, setPayer] = useState<string>(selfId);
   const [manualSplits, setManualSplits] = useState<Split[] | null>(null);
   const [memo, setMemo] = useState('');
+  /** 編集で読み込んだときの支払者。変わっていなければメンバー検査を省く（列11） */
+  const [loadedPayer, setLoadedPayer] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState('');
   const [busy, setBusy] = useState(false);
@@ -94,6 +96,7 @@ export function TransactionFormPage() {
       setAmountText(String(tx.amount));
       setPayer(tx.payer_id ?? SHARED);
       setMemo(tx.memo);
+      setLoadedPayer(tx.payer_id ?? SHARED);
       if (tx.splits_are_manual) {
         setManualSplits(tx.transaction_splits.map((s) => ({ userId: s.user_id, amount: s.amount })));
       }
@@ -122,6 +125,7 @@ export function TransactionFormPage() {
       payerId,
       memberIds,
       splits,
+      payerUnchanged: loadedPayer === payer,
     });
     if (!check.ok) {
       setError(check.message);
