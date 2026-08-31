@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { budgetCsv, categoryCsv, groupCsv, transactionCsv } from './export';
+import {
+  budgetCsv,
+  canSpecifyPeriod,
+  categoryCsv,
+  filterByMonth,
+  groupCsv,
+  transactionCsv,
+} from './export';
 import { parseCsvRows } from '../../lib/csv';
 
 const names = { u1: 'たかし', u2: 'はなこ' };
@@ -127,5 +134,20 @@ describe('groupCsv', () => {
     expect(rows).toHaveLength(2);
     expect(rows[0]).toMatchObject({ グループ: '夫婦', メンバー: 'たかし', 負担割合: '1', 表示順: '10' });
     expect(rows[1]).toMatchObject({ メンバー: 'はなこ', 負担割合: '3' });
+  });
+});
+
+describe('期間の指定', () => {
+  it('列2 取引は対象月で絞れる', () => {
+    const rows = [tx, { ...tx, occurredOn: '2026-07-31' }];
+    expect(filterByMonth(rows, '2026-08')).toHaveLength(1);
+    expect(filterByMonth(rows, null)).toHaveLength(2);
+  });
+
+  it('列9 期間を指定できるのは取引と予算だけ', () => {
+    expect(canSpecifyPeriod('transactions')).toBe(true);
+    expect(canSpecifyPeriod('budgets')).toBe(true);
+    expect(canSpecifyPeriod('categories')).toBe(false);
+    expect(canSpecifyPeriod('groups')).toBe(false);
   });
 });

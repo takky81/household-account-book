@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { buildBudgetRows, budgetUsage, scopeTotals } from './usage';
+import {
+  applyBudget,
+  buildBudgetRows,
+  budgetUsage,
+  copyBudgets,
+  scopeTotals,
+  validateBudgetAmount,
+} from './usage';
 
 describe('budgetUsage', () => {
   it('列1 予算に届かないときは消化率と残額を出す', () => {
@@ -75,5 +82,49 @@ describe('scopeTotals', () => {
     const own = totals.find((t) => t.ownerId === 'u1')!;
     expect(own.budget).toBe(20000);
     expect(own.actual).toBe(8200);
+  });
+});
+
+describe('validateBudgetAmount', () => {
+  it('列6 0円と負の予算は置けない', () => {
+    expect(validateBudgetAmount(0).ok).toBe(false);
+    expect(validateBudgetAmount(-1).ok).toBe(false);
+  });
+
+  it('1以上なら置ける', () => {
+    expect(validateBudgetAmount(20000)).toEqual({ ok: true });
+  });
+});
+
+describe('applyBudget', () => {
+  it('列7 同じカテゴリ・同じ対象月なら上書きになる', () => {
+    const before = [{ categoryId: 'c1', month: '2026-08-01', amount: 100000 }];
+    const after = applyBudget(before, { categoryId: 'c1', month: '2026-08-01', amount: 120000 });
+    expect(after).toEqual([{ categoryId: 'c1', month: '2026-08-01', amount: 120000 }]);
+  });
+
+  it('対象月が違えば別の行になる', () => {
+    const before = [{ categoryId: 'c1', month: '2026-07-01', amount: 100000 }];
+    const after = applyBudget(before, { categoryId: 'c1', month: '2026-08-01', amount: 120000 });
+    expect(after).toHaveLength(2);
+  });
+});
+
+describe('copyBudgets', () => {
+  it('列9 前月の予算を当月に複製する', () => {
+    const prev = [
+      { categoryId: 'c1', month: '2026-07-01', amount: 120000 },
+      { categoryId: 'c2', month: '2026-07-01', amount: 55000 },
+    ];
+    expect(copyBudgets(prev, '2026-08')).toEqual([
+      { categoryId: 'c1', month: '2026-08-01', amount: 120000 },
+      { categoryId: 'c2', month: '2026-08-01', amount: 55000 },
+    ]);
+  });
+
+  it('列9 すでに当月にある予算は上書きしない', () => {
+    const prev = [{ categoryId: 'c1', month: '2026-07-01', amount: 120000 }];
+    const current = [{ categoryId: 'c1', month: '2026-08-01', amount: 130000 }];
+    expect(copyBudgets(prev, '2026-08', current)).toEqual([]);
   });
 });

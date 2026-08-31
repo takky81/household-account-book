@@ -78,3 +78,37 @@ export function scopeTotals(rows: BudgetRow[]): ScopeTotal[] {
   }
   return [...totals.values()];
 }
+
+export type BudgetEntry = { categoryId: string; month: string; amount: number };
+
+/** 予算として置ける金額か（列6）。予算なしは行が無いことで表すので、0円は作れない。 */
+export function validateBudgetAmount(amount: number): { ok: true } | { ok: false; message: string } {
+  if (!Number.isInteger(amount) || amount <= 0) {
+    return { ok: false, message: '予算は1以上の整数にしてください' };
+  }
+  return { ok: true };
+}
+
+/** 同じカテゴリ・同じ対象月の予算は1件だけ。置き直すと上書きになる（列7）。 */
+export function applyBudget(budgets: BudgetEntry[], entry: BudgetEntry): BudgetEntry[] {
+  const rest = budgets.filter(
+    (b) => !(b.categoryId === entry.categoryId && b.month === entry.month),
+  );
+  return [...rest, entry];
+}
+
+/**
+ * 前月の予算を対象月に複製する（列9）。
+ * 予算は月をまたいで繰り越さないので、複製は明示的な操作として用意する。
+ * すでに当月にある予算は上書きしない。
+ */
+export function copyBudgets(
+  previous: BudgetEntry[],
+  monthKey: string,
+  current: BudgetEntry[] = [],
+): BudgetEntry[] {
+  const taken = new Set(current.map((b) => b.categoryId));
+  return previous
+    .filter((b) => !taken.has(b.categoryId))
+    .map((b) => ({ categoryId: b.categoryId, month: `${monthKey}-01`, amount: b.amount }));
+}

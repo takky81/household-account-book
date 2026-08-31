@@ -1,10 +1,10 @@
 -- 権限モデルの穴が塞がっているか（docs/仕様書.md §2.6 / §2.7）
 -- supabase-js から直接叩ける操作を SQL で再現して、通らないことを確かめる。
--- 決定表: アクセス制御 列2・列3・列4・列5・列6・列7・列8・列9・列10・列11・列12
+-- 決定表: アクセス制御 列2・列3・列4・列5・列6・列7・列8・列9・列10・列11・列12・列13・列14
 -- 決定表: 取引の入力と編集 列4
 -- 決定表: 予算 列5・列8
 begin;
-select plan(14);
+select plan(16);
 
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
 values
@@ -128,6 +128,22 @@ select throws_ok(
            and c.kind = 'expense' and c.is_system),
        (select gid from fx)) $$,
   'P0001', null, '属さないグループへカテゴリを押し込めない'
+);
+
+-- 他人の表示名は変えられない（参照は全員に開けるが更新は本人だけ）
+update public.profiles set display_name = 'のっとり'
+ where id = '11111111-1111-1111-1111-111111111111';
+select is(
+  (select p.display_name from public.profiles p
+    where p.id = '11111111-1111-1111-1111-111111111111'),
+  'taro', '他人の表示名は更新されない'
+);
+
+-- profiles は全員が読めるので、参照できないカテゴリ id を既定に置けてはいけない
+select throws_ok(
+  $$ update public.profiles set default_category_id = (select cat from ids)
+      where id = '33333333-3333-3333-3333-333333333333' $$,
+  'P0001', null, '参照できないカテゴリを既定にできない'
 );
 
 -- 未ログインからは RPC を叩けない

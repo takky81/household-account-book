@@ -134,3 +134,19 @@ export function groupCsv(
     ),
   );
 }
+
+/** 書き出せる対象。期間を指定できるのは取引と予算だけ（§4.5）。 */
+export type ExportTarget = 'transactions' | 'categories' | 'budgets' | 'groups';
+
+export function canSpecifyPeriod(target: ExportTarget): boolean {
+  return target === 'transactions' || target === 'budgets';
+}
+
+/** 対象月で絞る。null なら全期間。 */
+export function filterByMonth<T extends { occurredOn: string }>(
+  rows: T[],
+  monthKey: string | null,
+): T[] {
+  if (monthKey === null) return rows;
+  return rows.filter((row) => monthKeyOf(row.occurredOn) === monthKey);
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SHARED_PAYER, aggregateMonth, targetUsers, type AggregateTx } from './aggregate';
+import { SHARED_PAYER, aggregateMonth, monthDiff, targetUsers, type AggregateTx } from './aggregate';
 
 const 夫婦 = 'g1';
 const taro = 'u1';
@@ -213,5 +213,15 @@ describe('aggregateMonth', () => {
     });
     expect(result).toMatchObject({ income: 0, expense: 0, balance: 0 });
     expect(result.byCategory).toEqual([]);
+  });
+});
+
+describe('monthDiff', () => {
+  it('列9 前月比は当月の支出合計から前月を引いた値', () => {
+    const scope = { kind: 'group', shareGroupId: 夫婦 } as const;
+    const common = { transactions: all, scope, basis: 'burden' as const, selfId: taro, members };
+    const current = aggregateMonth({ ...common, monthKey: '2026-08' });
+    const previous = aggregateMonth({ ...common, monthKey: '2026-07' });
+    expect(monthDiff(current, previous)).toBe(124200 - 100000);
   });
 });
