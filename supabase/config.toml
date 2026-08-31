@@ -216,8 +216,10 @@ web3 = 30
 # secret = ""
 
 [auth.email]
+# ここを false にすると新規登録だけでなくメールログイン自体が止まる。
+# サインアップの閉鎖は [auth] の enable_signup = false で行う（docs/仕様書.md §2.3）。
 # Allow/disallow new user signups via email to your project.
-enable_signup = false
+enable_signup = true
 # If enabled, a user will be required to confirm any email change on both the old, and new email
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
