@@ -27,6 +27,38 @@ export function CategoriesPage() {
   const [moveTarget, setMoveTarget] = useState<{ id: string; dest: string } | null>(null);
   const [confirm, setConfirm] = useState<{ message: string; merge: boolean } | null>(null);
 
+  /** 名前を変える。同じ共有範囲の同名は保存する前に弾く（列3） */
+  async function rename(categoryId: string, raw: string) {
+    setError('');
+    const category = workspace.categories.find((c) => c.id === categoryId);
+    if (category === undefined || normalizeCategoryName(raw) === category.name) return;
+    const check = validateCategoryName(raw);
+    if (!check.ok) {
+      setError(check.message);
+      return;
+    }
+    const conflict = findNameConflict(
+      workspace.categories.map(toCategoryLike),
+      {
+        shareGroupId: category.share_group_id,
+        ownerId: category.owner_id,
+        kind: category.kind,
+        name: raw,
+      },
+      categoryId,
+    );
+    if (conflict !== null) {
+      setError('同じ共有範囲に同じ名前のカテゴリがあります');
+      return;
+    }
+    try {
+      await updateCategory(categoryId, { name: normalizeCategoryName(raw) });
+      await workspace.reload();
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : '変えられませんでした');
+    }
+  }
+
   const scoped = groupByScope(workspace.categories.filter((c) => c.kind === kind));
 
   async function add() {
@@ -180,8 +212,32 @@ export function CategoriesPage() {
           />
           {group.items.map((category) => (
             <div key={category.id} className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-sm">
-                {category.name}
+              <span className="flex items-center gap-2 text-sm">
+                {category.is_system ? (
+                  category.name
+                ) : (
+                  <TextInput
+                    aria-label={`${category.name}の名前`}
+                    className="w-28"
+                    defaultValue={category.name}
+                    key={category.name}
+                    onBlur={(e) => void rename(category.id, e.target.value)}
+                  />
+                )}
+                {!category.is_system && (
+                  <input
+                    type="color"
+                    aria-label={`${category.name}の色`}
+                    className="h-6 w-8 rounded border border-[var(--c-edge)]"
+                    defaultValue={category.color}
+                    key={`${category.id}-color`}
+                    onBlur={async (e) => {
+                      if (e.target.value === category.color) return;
+                      await updateCategory(category.id, { color: e.target.value });
+                      await workspace.reload();
+                    }}
+                  />
+                )}
                 {category.is_archived && (
                   <span className="ml-1 text-xs text-[var(--c-muted)]">アーカイブ済み</span>
                 )}
