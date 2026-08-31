@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createSubmitGuard } from './submitGuard';
 
-describe('createSubmitGuard（決定表「表示設定と共通の振る舞い」列12）', () => {
+describe('createSubmitGuard（決定表「表示設定と共通の振る舞い」列4）', () => {
   it('処理中の間は同じ操作を受け付けない', async () => {
     const guard = createSubmitGuard();
     let calls = 0;

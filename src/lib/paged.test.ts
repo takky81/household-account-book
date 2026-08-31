@@ -22,7 +22,7 @@ function source(total: number, options: { cap?: number; countable?: boolean } = 
   };
 }
 
-describe('fetchAll（決定表「出題順」列16・「学習履歴の集計」列20）', () => {
+describe('fetchAll（決定表「集計」列11）', () => {
   it('上限を超えても全件を取る', async () => {
     const { fetchPage, calls } = source(2500);
     const all = await fetchAll(fetchPage, 1000);

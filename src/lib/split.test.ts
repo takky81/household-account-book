@@ -120,7 +120,7 @@ describe('splitAmount', () => {
 });
 
 describe('fillRemainder', () => {
-  it('列14 残額を他のメンバーに割り付ける', () => {
+  it('残額を他のメンバーに割り付ける', () => {
     const splits = fillRemainder([taro, hana], 1000, [{ userId: 'a-taro', amount: 400 }]);
     expect(splits).toEqual([
       { userId: 'a-taro', amount: 400 },
