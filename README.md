@@ -15,10 +15,11 @@
 | DB（マイグレーション・RLS・RPC・pgTAP） | できている |
 | 決定表 | 12表140列 |
 | ワイヤーフレーム | できている |
-| 画面の実装 | これから |
+| 画面の実装 | できている |
+| テスト | ユニット 196 / pgTAP 45 / E2E 59 |
 
-決定表のカバレッジ（`npm run spec:coverage`）は現在 23/140 列。DB のテストで押さえた列だけが
-数えられている。画面とユニットテストを書きながら残りを埋める。
+決定表のカバレッジ（`npm run spec:coverage`）は 140/140 列。押さえられていない列があると
+CI が落ちる。
 
 ## 始め方
 
@@ -41,7 +42,7 @@ npm run typecheck      # 型検査
 npm run build          # 型検査 + ビルド
 npm run db:reset       # マイグレーションを流し直す
 npm run db:test        # DB のテスト（supabase/tests/*.test.sql）
-npm run test:e2e       # E2E（先に db:start と dev が要る）
+npm run test:e2e       # E2E（先に db:start が要る。dev サーバーは自動で立つ）
 npm run spec           # 決定表を spec/dist/index.html に出す
 npm run spec:coverage  # 決定表の列がテストで押さえられているかを数える
 ```
@@ -55,5 +56,9 @@ npm run spec:coverage  # 決定表の列がテストで押さえられている�
   金額・カテゴリの UPDATE、負担の直接の書き込みは `authenticated` に与えていない
 - **列の制限は GRANT で行う。** テーブルレベルの UPDATE は全列を含み、そこから
   `revoke update (col)` で差し引けない。許可列だけを列挙して grant する
+- **テストは決定表の列に紐づける。** テスト名を「列N …」で始めると
+  `npm run spec:coverage` が数える。画面から作れない状況（存在しない利用者、非メンバーの
+  操作）は pgTAP に、画面の振る舞いは E2E に置く。pgTAP と E2E は同じ DB を使うので、
+  pgTAP 側の利用者とグループ名は `pg-` で始めて衝突を避けている
 - **RLS の穴は pgTAP で塞いだことを確かめる。** `supabase/tests/02-access.test.sql` は
   supabase-js から直接叩ける操作を SQL で再現し、通らないことを見ている
