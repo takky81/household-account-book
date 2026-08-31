@@ -9,11 +9,11 @@ select plan(16);
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
 values
   ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000',
-   'authenticated', 'authenticated', 'taro@example.com', 'x', now(), now()),
+   'authenticated', 'authenticated', 'pg-taro@example.com', 'x', now(), now()),
   ('22222222-2222-2222-2222-222222222222', '00000000-0000-0000-0000-000000000000',
-   'authenticated', 'authenticated', 'hana@example.com', 'x', now(), now()),
+   'authenticated', 'authenticated', 'pg-hana@example.com', 'x', now(), now()),
   ('33333333-3333-3333-3333-333333333333', '00000000-0000-0000-0000-000000000000',
-   'authenticated', 'authenticated', 'other@example.com', 'x', now(), now());
+   'authenticated', 'authenticated', 'pg-other@example.com', 'x', now(), now());
 
 set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 set local role authenticated;
@@ -136,7 +136,7 @@ update public.profiles set display_name = 'のっとり'
 select is(
   (select p.display_name from public.profiles p
     where p.id = '11111111-1111-1111-1111-111111111111'),
-  'taro', '他人の表示名は更新されない'
+  'pg-taro', '他人の表示名は更新されない'
 );
 
 -- profiles は全員が読めるので、参照できないカテゴリ id を既定に置けてはいけない

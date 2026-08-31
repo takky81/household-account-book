@@ -6,9 +6,9 @@ select plan(11);
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
 values
   ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000',
-   'authenticated', 'authenticated', 'taro@example.com', 'x', now(), now()),
+   'authenticated', 'authenticated', 'pg-taro@example.com', 'x', now(), now()),
   ('22222222-2222-2222-2222-222222222222', '00000000-0000-0000-0000-000000000000',
-   'authenticated', 'authenticated', 'hana@example.com', 'x', now(), now());
+   'authenticated', 'authenticated', 'pg-hana@example.com', 'x', now(), now());
 
 set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 set local role authenticated;

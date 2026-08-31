@@ -9,19 +9,23 @@ select plan(12);
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
 values
   ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000',
-   'authenticated', 'authenticated', 'taro@example.com', 'x', now(), now()),
+   'authenticated', 'authenticated', 'pg-taro@example.com', 'x', now(), now()),
   ('22222222-2222-2222-2222-222222222222', '00000000-0000-0000-0000-000000000000',
-   'authenticated', 'authenticated', 'hana@example.com', 'x', now(), now()),
+   'authenticated', 'authenticated', 'pg-hana@example.com', 'x', now(), now()),
   ('33333333-3333-3333-3333-333333333333', '00000000-0000-0000-0000-000000000000',
-   'authenticated', 'authenticated', 'other@example.com', 'x', now(), now());
+   'authenticated', 'authenticated', 'pg-other@example.com', 'x', now(), now());
 
+-- E2E 用の利用者が同じ DB に残っていることがあるので、この3人だけを数える
 select is(
-  (select count(*)::int from public.profiles), 3,
+  (select count(*)::int from public.profiles
+    where id in ('11111111-1111-1111-1111-111111111111',
+                 '22222222-2222-2222-2222-222222222222',
+                 '33333333-3333-3333-3333-333333333333')), 3,
   '利用者を作ると profiles ができる'
 );
 select is(
   (select display_name from public.profiles where id = '11111111-1111-1111-1111-111111111111'),
-  'taro', '表示名の初期値はメールのローカル部'
+  'pg-taro', '表示名の初期値はメールのローカル部'
 );
 select is(
   (select count(*)::int from public.categories
@@ -32,10 +36,10 @@ select is(
 -- 同じローカル部の2人目は連番が付く（一意制約で利用者作成ごと失敗させない）
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
 values ('44444444-4444-4444-4444-444444444444', '00000000-0000-0000-0000-000000000000',
-        'authenticated', 'authenticated', 'taro@other.example.com', 'x', now(), now());
+        'authenticated', 'authenticated', 'pg-taro@other.example.com', 'x', now(), now());
 select is(
   (select display_name from public.profiles where id = '44444444-4444-4444-4444-444444444444'),
-  'taro-2', '表示名が重なると連番を付ける'
+  'pg-taro-2', '表示名が重なると連番を付ける'
 );
 
 -- ここから taro として操作する

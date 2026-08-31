@@ -21,6 +21,7 @@ const SOURCES: Record<string, string[]> = {
     'e2e/group.spec.ts',
     'src/features/groups/members.test.ts',
     'supabase/tests/01-basics.test.sql',
+    'supabase/tests/04-groups.test.sql',
   ],
   カテゴリの管理: ['e2e/category.spec.ts', 'src/features/categories/name.test.ts'],
   取引の入力と編集: [
