@@ -124,6 +124,8 @@ export function BudgetPage() {
                 <td className="p-2 text-right">
                   <input
                     aria-label={`${row.name}の予算`}
+                    // 複製や削除で値が変わったら入力欄も引き直す
+                    key={`${row.categoryId}-${row.budget ?? ''}`}
                     className="w-24 rounded border border-[var(--c-edge)] bg-[var(--c-panel)] px-1 py-0.5 text-right text-sm"
                     defaultValue={row.budget === null ? '' : String(row.budget)}
                     onBlur={(e) => void change(row.categoryId, e.target.value)}

@@ -20,12 +20,10 @@ jobs:
         working-directory: spec
         run: npm run build
       # すべての列がテストで押さえられていることを確かめる。
-      # 実装はこれからなので、いまは落とさずに数字だけ出す。
-      # ユニットテストと E2E が揃ったら continue-on-error を外す。
+      # 押さえられていない列があれば落ちる。
       - name: 決定表のカバレッジ
         working-directory: spec
         run: npm run coverage
-        continue-on-error: true
 
   db:
     name: データベース
@@ -64,3 +62,36 @@ jobs:
         env:
           VITE_SUPABASE_URL: http://127.0.0.1:54421
           VITE_SUPABASE_ANON_KEY: dummy-for-build
+
+  e2e:
+    name: E2E
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.116.0
+      - run: npm ci
+      - name: ブラウザを入れる
+        run: npx playwright install --with-deps chromium
+      - name: ローカル Supabase を立ち上げる
+        run: supabase start
+      # 開発サーバーが読む .env.local を、立ち上げた Supabase の値から作る
+      - name: 接続先を書き出す
+        run: |
+          echo "VITE_SUPABASE_URL=$(supabase status -o json | jq -r .API_URL)" >> .env.local
+          echo "VITE_SUPABASE_ANON_KEY=$(supabase status -o json | jq -r .ANON_KEY)" >> .env.local
+      - name: E2E
+        run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+      - name: 片づける
+        if: always()
+        run: supabase stop

@@ -20,7 +20,7 @@ set local role authenticated;
 
 create temp table fx as
 select public.create_share_group(
-  '夫婦',
+  'pg-夫婦',
   '[{"user_id":"11111111-1111-1111-1111-111111111111","default_weight":1,"sort_order":10},
     {"user_id":"22222222-2222-2222-2222-222222222222","default_weight":1,"sort_order":20}]'::jsonb
 ) as gid;

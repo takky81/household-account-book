@@ -277,13 +277,21 @@ export async function saveBudget(input: {
   month: string;
   amount: number;
 }): Promise<void> {
-  const { error } = await supabase
+  // upsert（on conflict do update）は category_id と month の UPDATE 権限まで要求するが、
+  // budgets に許しているのは amount の更新だけ。更新してから、無ければ入れる（§2.6）
+  const updated = await supabase
     .from('budgets')
-    .upsert(
-      { category_id: input.categoryId, month: input.month, amount: input.amount },
-      { onConflict: 'category_id,month' },
-    );
-  if (error !== null) throw new Error(error.message);
+    .update({ amount: input.amount })
+    .eq('category_id', input.categoryId)
+    .eq('month', input.month)
+    .select('id');
+  if (updated.error !== null) throw new Error(updated.error.message);
+  if ((updated.data ?? []).length > 0) return;
+
+  const inserted = await supabase
+    .from('budgets')
+    .insert({ category_id: input.categoryId, month: input.month, amount: input.amount });
+  if (inserted.error !== null) throw new Error(inserted.error.message);
 }
 
 export async function deleteBudget(categoryId: string, month: string): Promise<void> {

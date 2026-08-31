@@ -2,6 +2,7 @@
 
 import { NavLink, Outlet } from 'react-router-dom';
 import { addMonths, formatMonth } from '../../lib/date';
+import { useNarrow } from '../../lib/useNarrow';
 import { cn } from '../../lib/utils';
 
 const NAV = [
@@ -14,23 +15,40 @@ const NAV = [
 ];
 
 export function Layout() {
+  // スマートフォンでの入力を主用途とする。狭いときは親指の届く下、広いときは上に置く（列3 / §6）
+  const narrow = useNarrow();
+  const links = NAV.map((item) => (
+    <NavLink
+      key={item.to}
+      to={item.to}
+      end={item.end}
+      className={({ isActive }) =>
+        cn('px-2', isActive ? 'font-bold text-[var(--c-ink)]' : 'text-[var(--c-muted)]')
+      }
+    >
+      {item.label}
+    </NavLink>
+  ));
+
   return (
-    <div className="min-h-screen pb-16">
+    <div className={cn('min-h-screen', narrow && 'pb-16')}>
+      {!narrow && (
+        <nav
+          data-testid="nav-top"
+          className="sticky top-0 z-10 flex justify-center gap-4 border-b border-[var(--c-line)] bg-[var(--c-panel)] py-2 text-sm"
+        >
+          {links}
+        </nav>
+      )}
       <Outlet />
-      <nav className="fixed inset-x-0 bottom-0 flex justify-around border-t border-[var(--c-line)] bg-[var(--c-panel)] py-2 text-xs">
-        {NAV.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            className={({ isActive }) =>
-              cn('px-2', isActive ? 'font-bold text-[var(--c-ink)]' : 'text-[var(--c-muted)]')
-            }
-          >
-            {item.label}
-          </NavLink>
-        ))}
-      </nav>
+      {narrow && (
+        <nav
+          data-testid="nav-bottom"
+          className="fixed inset-x-0 bottom-0 flex justify-around border-t border-[var(--c-line)] bg-[var(--c-panel)] py-2 text-xs"
+        >
+          {links}
+        </nav>
+      )}
     </div>
   );
 }

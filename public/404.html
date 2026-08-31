@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <title>家計簿</title>
+    <script>
+      // GitHub Pages はサブパスの直リンクを 404 にする。行き先を控えてトップへ送り、
+      // index.html 側で URL を戻す（docs/仕様書.md §2.2 / 決定表「表示設定と共通の振る舞い」列5）
+      (function () {
+        var base = '/household-account-book/';
+        sessionStorage.setItem('deep-link', location.pathname + location.search + location.hash);
+        location.replace(base);
+      })();
+    </script>
+  </head>
+  <body></body>
+</html>

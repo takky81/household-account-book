@@ -17,7 +17,7 @@ set local role authenticated;
 -- 決定表: 共有グループの管理 列3
 select throws_ok(
   $$select public.create_share_group(
-      '夫婦',
+      'pg-夫婦',
       '[{"user_id":"11111111-1111-1111-1111-111111111111","default_weight":1,"sort_order":10},
         {"user_id":"99999999-9999-9999-9999-999999999999","default_weight":1,"sort_order":20}]'::jsonb
     )$$,
@@ -25,13 +25,13 @@ select throws_ok(
   '存在しない利用者を含むグループは作れない'
 );
 select is(
-  (select count(*)::int from public.share_groups), 0,
+  (select count(*)::int from public.share_groups g where g.name = 'pg-夫婦'), 0,
   '弾かれたときはグループも残らない'
 );
 
 create temp table fx as
 select public.create_share_group(
-  '夫婦',
+  'pg-夫婦',
   '[{"user_id":"11111111-1111-1111-1111-111111111111","default_weight":1,"sort_order":10},
     {"user_id":"22222222-2222-2222-2222-222222222222","default_weight":1,"sort_order":20}]'::jsonb
 ) as gid;
