@@ -4,8 +4,8 @@ import { defineConfig, devices } from '@playwright/test';
  * E2E は開発サーバーとローカル Supabase に対して走らせる。
  * 事前に `npm run db:start` でローカル Supabase を立ち上げておくこと。
  *
- * テスト用の利用者を作る globalSetup は、最初の E2E を書くときに足す。
- * いまは e2e/ が空なので置いていない。
+ * globalSetup でテスト用の利用者を作り、各テストの前にデータを空へ戻す（e2e/fixtures.ts）。
+ * pgTAP と同じ DB を使うので、pgTAP 側の利用者やグループ名は pg- で始めて分けてある。
  */
 export default defineConfig({
   testDir: './e2e',
