@@ -16,7 +16,7 @@
 | 決定表 | 12表140列 |
 | ワイヤーフレーム | できている |
 | 画面の実装 | できている |
-| テスト | ユニット 204 / pgTAP 45 / E2E 59 |
+| テスト | ユニット 204 / pgTAP 49 / E2E 59 |
 
 決定表のカバレッジ（`npm run spec:coverage`）は 140/140 列。押さえられていない列があると
 CI が落ちる。
@@ -98,5 +98,10 @@ anon key はブラウザに出る前提の公開値。実際の権限は RLS が
   `npm run spec:coverage` が数える。画面から作れない状況（存在しない利用者、非メンバーの
   操作）は pgTAP に、画面の振る舞いは E2E に置く。pgTAP と E2E は同じ DB を使うので、
   pgTAP 側の利用者とグループ名は `pg-` で始めて衝突を避けている
+- **REST にさらす関数を絞る。** PostgREST は公開スキーマの関数を
+  `/rest/v1/rpc/<名前>` として全部さらす。ポリシーやトリガから呼ぶ判定関数は
+  `authenticated` に EXECUTE を与えざるを得ないので `private` スキーマへ置く。
+  さらしてよいのは画面が呼ぶ RPC 9本だけで、その範囲は
+  `supabase/tests/05-exposure.test.sql` が固定している
 - **RLS の穴は pgTAP で塞いだことを確かめる。** `supabase/tests/02-access.test.sql` は
   supabase-js から直接叩ける操作を SQL で再現し、通らないことを見ている
