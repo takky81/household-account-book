@@ -1,6 +1,9 @@
 # 依存パッケージ
 node_modules/
 
+# ローカル Supabase の作業ファイル。起動のたびに作られ、秘密鍵を含む
+supabase/.temp/
+
 # ビルド生成物
 dist/
 build/
