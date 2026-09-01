@@ -66,6 +66,8 @@ test.describe('予算', () => {
     await seedBudget(category, thisMonth(), 10000);
 
     await signedIn.goto('/budget');
+    // 読み込みが終わってから触る。終わる前に入れると読み込みが上書きしてしまう
+    await expect(signedIn.getByLabel('食費の予算')).toHaveValue('10000');
     await signedIn.getByLabel('食費の予算').fill('12000');
     await signedIn.getByLabel('食費の予算').blur();
 
@@ -80,6 +82,29 @@ test.describe('予算', () => {
       })
       .toBe(12000);
     expect(await countBudgets(category)).toBe(1);
+  });
+
+  test('読み込みが終わるまで予算の入力欄を出さない', async ({ signedIn, users }) => {
+    const category = await seedCategory({ ownerId: users.taro, name: '食費' });
+    await seedBudget(category, thisMonth(), 10000);
+
+    // 予算の取得を止めておく。空の入力欄を先に出すと、値が届いた時点で入力欄が
+    // 作り直され、その間に打ち込んだ内容が黙って消える
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await signedIn.route('**/rest/v1/budgets*', async (route) => {
+      await held;
+      await route.continue();
+    });
+
+    await signedIn.goto('/budget');
+    await expect(signedIn.getByText('読み込んでいます…')).toBeVisible();
+    await expect(signedIn.getByLabel('食費の予算')).toHaveCount(0);
+
+    release();
+    await expect(signedIn.getByLabel('食費の予算')).toHaveValue('10000');
   });
 
   test('列9 前月の予算を複製できる', async ({ signedIn, users }) => {

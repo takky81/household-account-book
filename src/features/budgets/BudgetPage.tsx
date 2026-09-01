@@ -26,6 +26,8 @@ export function BudgetPage() {
   const [previous, setPrevious] = useState<Budget[]>([]);
   const [rows, setRows] = useState<Transaction[]>([]);
   const [error, setError] = useState('');
+  /** 対象月の予算を読み終えたか。読む前に表を出すと、入力欄が空で描かれてしまう */
+  const [loaded, setLoaded] = useState(false);
 
   const reload = useMemo(
     () => async () => {
@@ -41,7 +43,11 @@ export function BudgetPage() {
     [monthKey],
   );
   useEffect(() => {
-    void reload();
+    // 月を変えたら読み直す。読み終わるまで表は出さない。
+    // 空の入力欄を先に出すと、値が届いた時点で入力欄が作り直され、
+    // その間に打ち込んだ内容が消える
+    setLoaded(false);
+    void reload().finally(() => setLoaded(true));
   }, [reload]);
 
   const budgetRows = buildBudgetRows({
@@ -98,6 +104,9 @@ export function BudgetPage() {
 
       <ErrorText>{error}</ErrorText>
 
+      {!loaded && <p className="text-xs text-[var(--c-muted)]">読み込んでいます…</p>}
+
+      {loaded && (
       <Card className="overflow-x-auto p-0">
         <table className="w-full text-sm">
           <thead>
@@ -164,6 +173,7 @@ export function BudgetPage() {
           </tfoot>
         </table>
       </Card>
+      )}
     </main>
   );
 }
