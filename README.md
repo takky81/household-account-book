@@ -16,7 +16,7 @@
 | 決定表 | 12表140列 |
 | ワイヤーフレーム | できている |
 | 画面の実装 | できている |
-| テスト | ユニット 196 / pgTAP 45 / E2E 59 |
+| テスト | ユニット 204 / pgTAP 45 / E2E 59 |
 
 決定表のカバレッジ（`npm run spec:coverage`）は 140/140 列。押さえられていない列があると
 CI が落ちる。
@@ -46,6 +46,44 @@ npm run test:e2e       # E2E（先に db:start が要る。dev サーバーは�
 npm run spec           # 決定表を spec/dist/index.html に出す
 npm run spec:coverage  # 決定表の列がテストで押さえられているかを数える
 ```
+
+## 本番へ出す
+
+配信は GitHub Pages、データは Supabase のホスト版。**アプリを配信する前に Supabase 側を
+先に整える**（順番を逆にすると、開いた人がログインできないか、誰でもアカウントを作れる状態になる）。
+
+### 1. Supabase プロジェクト
+
+```bash
+npx supabase link --project-ref <プロジェクトの ref>
+npx supabase db push        # supabase/migrations/*.sql を本番へ適用する
+```
+
+`supabase/config.toml` は**ローカルの Docker にしか効かない**。本番の同じ設定は管理画面で行う。
+
+| 管理画面の場所 | 値 | 理由 |
+| --- | --- | --- |
+| Authentication > Sign In / Providers | **Allow new users to sign up: オフ** | 閉じ忘れると誰でもアカウントを作れる。データは RLS が守るが、無関係な利用者が増える（§2.3） |
+| Authentication > Sign In / Providers | Email: オン、Confirm email: オフ | メールは送らない。ログインIDとしてだけ使う |
+| Authentication > URL Configuration | Site URL に Pages の URL | |
+| Authentication > Users | 利用者を手で追加 | サインアップを閉じているため。表示名はメールのローカル部から自動で付く |
+
+### 2. GitHub
+
+- リポジトリの Settings > Secrets に `VITE_SUPABASE_URL` と
+  `VITE_SUPABASE_ANON_KEY`（新しいプロジェクトなら `VITE_SUPABASE_PUBLISHABLE_KEY`）を登録する。
+  未登録でもビルドは通るが、開いた人には「設定が足りません」の画面しか出ない
+- Settings > Pages の Source を GitHub Actions にする
+- `main` に入ると [deploy.yml](.github/workflows/deploy.yml) が配信する
+
+anon key はブラウザに出る前提の公開値。実際の権限は RLS が決める（§2.3）。
+
+### 3. 出したあとの確認
+
+- ログインできる
+- `https://<user>.github.io/household-account-book/budget` を直接開いても 404 にならない
+  （`npm run build` が `dist/404.html` を作る）
+- 別の利用者でログインし、他人の個人カテゴリが見えないこと
 
 ## 作りの要点
 

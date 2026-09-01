@@ -35,9 +35,7 @@ jobs:
           # 公開キーはどちらの名前でも受ける。登録してあるほうが使われる
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
-      # 直接開いた URL でも index.html を返させる（SPA のため）
-      - name: 404.html を置く
-        run: cp dist/index.html dist/404.html
+      # 直接開いた URL でも index.html を返させる 404.html は npm run build が作る
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

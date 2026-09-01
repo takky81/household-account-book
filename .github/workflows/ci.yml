@@ -62,6 +62,9 @@ jobs:
         env:
           VITE_SUPABASE_URL: http://127.0.0.1:54421
           VITE_SUPABASE_ANON_KEY: dummy-for-build
+      # サブパスの直リンクは 404.html が受ける（§2.2）
+      - name: 404 のフォールバックがあること
+        run: test -f dist/404.html && cmp dist/index.html dist/404.html
 
   e2e:
     name: E2E

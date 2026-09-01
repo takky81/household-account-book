@@ -10,16 +10,6 @@
       href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap"
       rel="stylesheet"
     />
-    <script>
-      // 404.html から送られてきたときは、本来の URL に戻してからアプリを立ち上げる（§2.2）
-      (function () {
-        var target = sessionStorage.getItem('deep-link');
-        if (target !== null) {
-          sessionStorage.removeItem('deep-link');
-          history.replaceState(null, '', target);
-        }
-      })();
-    </script>
   </head>
   <body>
     <div id="root"></div>

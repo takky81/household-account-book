@@ -1,4 +1,3 @@
-import { existsSync, readFileSync } from 'node:fs';
 import { test, expect } from './fixtures';
 import { adminClient, seedCategory } from './db';
 
@@ -43,11 +42,11 @@ test.describe('表示設定と共通の振る舞い', () => {
   test('列5 直リンクで画面を開ける', async ({ signedIn }) => {
     await signedIn.goto('/budget');
     await expect(signedIn.getByRole('heading', { name: '予算' })).toBeVisible();
+    await signedIn.goto('/transactions/');
+    await expect(signedIn.getByRole('heading', { name: '取引一覧' })).toBeVisible();
 
-    // GitHub Pages のサブパスでも同じことができるよう 404.html を置く（§2.2）
-    expect(existsSync('public/404.html')).toBe(true);
-    const html = readFileSync('public/404.html', 'utf8');
-    expect(html).toContain('/household-account-book/');
+    // GitHub Pages のサブパスでは 404.html が同じ役目をする。
+    // 中身が index.html と一致することは CI のビルド後に確かめている（.github/workflows/ci.yml）
   });
 
   test('列6 通信に失敗しても入力は消えない', async ({ signedIn, users }) => {

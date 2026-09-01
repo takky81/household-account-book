@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Button, Card, ErrorText, Field, TextInput } from '../../components/ui';
+import { Button, Card, ErrorText, Field, Note, TextInput } from '../../components/ui';
 import { signInErrorMessage, validateCredentials } from './validation';
 
 export function LoginPage() {
@@ -56,6 +56,8 @@ export function LoginPage() {
           </Button>
         </form>
       </Card>
+      {/* 自分では作り直せない。アカウントは管理者が Supabase の管理画面で扱う（§2.3） */}
+      <Note>パスワードを忘れたときは、管理者に再設定を頼んでください</Note>
     </main>
   );
 }

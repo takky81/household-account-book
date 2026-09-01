@@ -19,6 +19,9 @@ import { ImportPage } from './features/transfer/ImportPage';
 import { ExportPage } from './features/transfer/ExportPage';
 import { SettingsPage } from './features/settings/SettingsPage';
 import { applyTheme, loadTheme, resolveTheme } from './lib/theme';
+import { configError } from './lib/supabase';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { Card, Note } from './components/ui';
 
 function Routed() {
   const { session, loading, userId } = useAuth();
@@ -64,9 +67,26 @@ export function App() {
     applyTheme(resolveTheme(loadTheme(), window.matchMedia('(prefers-color-scheme: dark)').matches));
   }, []);
 
+  // 接続先が無ければ何も動かない。黙って白い画面を出さず、足りないものを名指しする
+  if (configError !== null) {
+    return (
+      <main className="mx-auto flex max-w-md flex-col gap-3 p-6">
+        <h1 className="text-lg font-bold">設定が足りません</h1>
+        <Card>
+          <p role="alert" className="text-sm">
+            {configError}
+          </p>
+        </Card>
+        <Note>README の「本番へ出す」を見てください</Note>
+      </main>
+    );
+  }
+
   return (
-    <AuthProvider>
-      <Routed />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <Routed />
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
