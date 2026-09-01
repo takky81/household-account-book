@@ -30,7 +30,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: supabase/setup-cli@v1
+      # v3 は npm から入れる。package.json の supabase と同じ版に合わせる
+      - uses: supabase/setup-cli@v3
         with:
           version: 2.116.0
       # RLS と RPC の検査は pgTAP で行う（supabase/tests/*.test.sql）。
@@ -75,7 +76,8 @@ jobs:
         with:
           node-version-file: '.nvmrc'
           cache: npm
-      - uses: supabase/setup-cli@v1
+      # v3 は npm から入れる。package.json の supabase と同じ版に合わせる
+      - uses: supabase/setup-cli@v3
         with:
           version: 2.116.0
       - run: npm ci
