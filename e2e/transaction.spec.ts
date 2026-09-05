@@ -184,5 +184,6 @@ test.describe('取引の入力と編集', () => {
     await expect(signedIn.getByLabel('金額')).toHaveValue('');
     await expect(signedIn.getByLabel('備考')).toHaveValue('');
     await expect(signedIn.getByLabel('カテゴリ')).not.toHaveValue('');
+    await expect(signedIn.getByLabel('金額')).toBeFocused();
   });
 });

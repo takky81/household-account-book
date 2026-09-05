@@ -5,7 +5,7 @@
  * 手で直した負担はそのまま保存し、以後は自動で戻さない。
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Card, ErrorText, Field, Note, ScopeTag, Tabs, TextInput } from '../../components/ui';
 import { formatAmount, parseAmount } from '../../lib/money';
@@ -38,6 +38,8 @@ export function TransactionFormPage() {
   const [error, setError] = useState('');
   const [saved, setSaved] = useState('');
   const [busy, setBusy] = useState(false);
+  /** 続けて入力するとき、次の入力へすぐ移れるように金額へ戻す（列13） */
+  const amountRef = useRef<HTMLInputElement>(null);
 
   const category = workspace.categories.find((c) => c.id === categoryId) ?? null;
   const isPersonal = category !== null && category.share_group_id === null;
@@ -149,6 +151,7 @@ export function TransactionFormPage() {
         setMemo('');
         setManualSplits(null);
         setSaved('保存しました');
+        amountRef.current?.focus();
       } else {
         navigate('/transactions');
       }
@@ -216,6 +219,7 @@ export function TransactionFormPage() {
 
       <Field label="金額">
         <TextInput
+          ref={amountRef}
           inputMode="numeric"
           aria-label="金額"
           value={amountText}

@@ -2,7 +2,7 @@
  * 画面の部品。見た目は design/wireframes.html を正とし、色は src/index.css の変数だけを使う。
  */
 
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react';
+import type { ButtonHTMLAttributes, ComponentProps, ReactNode, SelectHTMLAttributes } from 'react';
 import { cn } from '../lib/utils';
 
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
@@ -59,7 +59,7 @@ export function Field({
 const inputClass =
   'rounded-md border border-[var(--c-edge)] bg-[var(--c-panel)] px-2 py-1.5 text-sm text-[var(--c-ink)]';
 
-export function TextInput({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
+export function TextInput({ className, ...props }: ComponentProps<'input'>) {
   return <input className={cn(inputClass, className)} {...props} />;
 }
 
