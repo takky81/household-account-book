@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Card, ErrorText, Field, ScopeTag, Tabs, TextInput } from '../../components/ui';
 import { formatAmount, parseAmount } from '../../lib/money';
-import { todayIso } from '../../lib/date';
+import { todayIso, weekdayOf } from '../../lib/date';
 import { defaultSplits, fillRemainder, type Split } from '../../lib/split';
 import { saveTransaction, type Transaction } from '../../lib/db';
 import { supabase } from '../../lib/supabase';
@@ -193,11 +193,16 @@ export function TransactionFormPage() {
       />
 
       <Field label="日付">
-        <TextInput
-          type="date"
-          value={occurredOn}
-          onChange={(e) => setOccurredOn(e.target.value)}
-        />
+        <div className="flex items-center gap-2">
+          <TextInput
+            type="date"
+            value={occurredOn}
+            onChange={(e) => setOccurredOn(e.target.value)}
+          />
+          {occurredOn !== '' && (
+            <span className="text-sm text-[var(--c-muted)]">{weekdayOf(occurredOn)}曜日</span>
+          )}
+        </div>
       </Field>
 
       <Field label="カテゴリ">

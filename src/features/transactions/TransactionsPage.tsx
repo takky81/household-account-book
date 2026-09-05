@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, Card, ErrorText, ScopeTag, Tabs, TextInput } from '../../components/ui';
 import { MonthNav } from '../app/Layout';
-import { currentMonthKey } from '../../lib/date';
+import { currentMonthKey, formatDay } from '../../lib/date';
 import { formatAmount } from '../../lib/money';
 import {
   deleteTransaction,
@@ -145,7 +145,7 @@ export function TransactionsPage() {
                       }
                     />
                   </td>
-                  <td className="p-2">{tx.occurred_on.slice(5)}</td>
+                  <td className="p-2">{formatDay(tx.occurred_on)}</td>
                   <td className="p-2">
                     <ScopeTag
                       label={workspace.scopeLabel(category)}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { addMonths, formatMonth, monthKeyOf, monthStart, todayIso } from './date';
+import { addMonths, formatDay, formatMonth, monthKeyOf, monthStart, todayIso, weekdayOf } from './date';
 
 describe('対象月', () => {
   it('列8 取引日の年月が対象月になる', () => {
@@ -25,5 +25,17 @@ describe('対象月', () => {
 
   it('画面に出す形にする', () => {
     expect(formatMonth('2026-08')).toBe('2026年8月');
+  });
+});
+
+describe('日付の表示', () => {
+  it('曜日を返す', () => {
+    expect(weekdayOf('2026-09-06')).toBe('日');
+    expect(weekdayOf('2026-09-07')).toBe('月');
+    expect(weekdayOf('2026-09-12')).toBe('土');
+  });
+
+  it('一覧に出す形にする', () => {
+    expect(formatDay('2026-09-06')).toBe('09-06(日)');
   });
 });

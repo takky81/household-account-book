@@ -51,3 +51,16 @@ export function formatMonth(monthKey: string): string {
 export function currentMonthKey(now: Date = new Date()): string {
   return monthKeyOf(todayIso(now));
 }
+
+const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'] as const;
+
+/** 取引日の曜日（日〜土）。 */
+export function weekdayOf(dateIso: string): string {
+  const [y, m, d] = dateIso.split('-').map(Number) as [number, number, number];
+  return WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()] as string;
+}
+
+/** 一覧に出す日付（MM-DD(曜)）。 */
+export function formatDay(dateIso: string): string {
+  return `${dateIso.slice(5)}(${weekdayOf(dateIso)})`;
+}
