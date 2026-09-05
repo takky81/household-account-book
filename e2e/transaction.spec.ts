@@ -56,6 +56,21 @@ test.describe('取引の入力と編集', () => {
     expect(splits).toEqual([{ user_id: users.taro, amount: 780 }]);
   });
 
+  test('列15 個人カテゴリでは負担の入力欄を出さない', async ({ signedIn, users }) => {
+    await seedCategory({ ownerId: users.taro, name: '日用品' });
+    const group = await seedGroup(users);
+    await seedCategory({ shareGroupId: group, name: '日用品' });
+
+    await signedIn.goto('/new');
+    await signedIn.getByLabel('カテゴリ').selectOption({ label: '個人 / 日用品' });
+    await signedIn.getByLabel('金額').fill('780');
+    await expect(signedIn.getByLabel('taroの負担')).toHaveCount(0);
+
+    // 共有カテゴリに変えれば出る
+    await signedIn.getByLabel('カテゴリ').selectOption({ label: '夫婦 / 日用品' });
+    await expect(signedIn.getByLabel('taroの負担')).toHaveValue('390');
+  });
+
   test('列7 負担を手で分けるとその通りに保存される', async ({ signedIn, users }) => {
     const group = await seedGroup(users);
     await seedCategory({ shareGroupId: group, name: '家賃' });

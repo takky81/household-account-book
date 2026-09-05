@@ -246,7 +246,8 @@ export function TransactionFormPage() {
         </Field>
       )}
 
-      {splits.length > 0 && (
+      {/* 個人カテゴリの負担は本人1行＝全額に決まり、他の値は保存できない（§3.6）ので出さない */}
+      {!isPersonal && splits.length > 0 && (
         <Card>
           <div className="mb-2 flex items-center justify-between">
             <h2 className="text-sm font-bold">負担</h2>
