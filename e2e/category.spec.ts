@@ -13,10 +13,11 @@ async function categoryOf(name: string): Promise<{
   share_group_id: string | null;
   owner_id: string | null;
   is_archived: boolean;
+  sort_order: number;
 }> {
   const { data, error } = await adminClient()
     .from('categories')
-    .select('id, share_group_id, owner_id, is_archived')
+    .select('id, share_group_id, owner_id, is_archived, sort_order')
     .eq('name', name)
     .single();
   if (error !== null) throw error;
@@ -25,6 +26,7 @@ async function categoryOf(name: string): Promise<{
     share_group_id: string | null;
     owner_id: string | null;
     is_archived: boolean;
+    sort_order: number;
   };
 }
 
@@ -219,5 +221,34 @@ test.describe('カテゴリの管理', () => {
 
     await expect(signedIn.getByRole('alert')).toContainText('同じ名前');
     expect((await categoryOf('趣味')).owner_id).toBe(users.taro);
+  });
+
+  test('列14 表示順を変えると入力の候補も並び替わる', async ({ signedIn }) => {
+    await signedIn.goto('/categories');
+    for (const name of ['趣味', '食費']) {
+      await signedIn.getByLabel('カテゴリ名').fill(name);
+      await signedIn.getByRole('button', { name: '追加' }).click();
+      await expect(signedIn.getByLabel(`${name}の名前`)).toBeVisible();
+    }
+
+    await signedIn.getByRole('button', { name: '食費を上へ' }).click();
+    await expect
+      .poll(async () => {
+        const [moved, other] = await Promise.all([categoryOf('食費'), categoryOf('趣味')]);
+        return moved.sort_order < other.sort_order;
+      })
+      .toBe(true);
+
+    // 未分類は末尾のまま（並べ替えの対象にしない）
+    expect((await categoryOf('趣味')).sort_order).toBeLessThan(9999);
+
+    // 入力の候補も同じ順で並ぶ
+    await signedIn.goto('/new');
+    const select = signedIn.getByLabel('カテゴリ');
+    await expect(select).toContainText('食費');
+    const options = await select.locator('option').allTextContents();
+    const at = (name: string) => options.findIndex((text) => text.includes(name));
+    expect(at('食費')).toBeLessThan(at('趣味'));
+    expect(at('趣味')).toBeLessThan(at('未分類'));
   });
 });

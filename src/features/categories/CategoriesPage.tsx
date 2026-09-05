@@ -8,9 +8,11 @@ import {
   loadTransactions,
   moveCategoryScope,
   updateCategory,
+  type Category,
 } from '../../lib/db';
 import { useAuth, useWorkspace, groupByScope } from '../app/context';
 import { findNameConflict, normalizeCategoryName, validateCategoryName, type Kind } from './name';
+import { nextSortOrder, reorder } from './order';
 import { checkMove, manualCount } from '../scope/move';
 import { toCategoryLike, toMoveTx } from '../app/model';
 
@@ -79,18 +81,44 @@ export function CategoriesPage() {
       setError('同じ共有範囲に同じ名前のカテゴリがあります');
       return;
     }
+    const siblings = workspace.categories.filter(
+      (c) =>
+        !c.is_system &&
+        c.kind === kind &&
+        c.share_group_id === shareGroupId &&
+        c.owner_id === (shareGroupId === null ? selfId : null),
+    );
     try {
       await createCategory({
         shareGroupId,
         kind,
         name: normalizeCategoryName(name),
         color: '#4a6fa5',
-        sortOrder: 100,
+        sortOrder: nextSortOrder(siblings.map((c) => ({ id: c.id, sortOrder: c.sort_order }))),
       });
       setName('');
       await workspace.reload();
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : '作れませんでした');
+    }
+  }
+
+  /** 同じ共有範囲の中で1つ上（下）へ動かす（列14） */
+  async function move(categoryId: string, siblings: Category[], direction: 'up' | 'down') {
+    setError('');
+    const changed = reorder(
+      siblings.map((c) => ({ id: c.id, sortOrder: c.sort_order })),
+      categoryId,
+      direction,
+    );
+    if (changed.length === 0) return;
+    try {
+      for (const item of changed) {
+        await updateCategory(item.id, { sort_order: item.sortOrder });
+      }
+      await workspace.reload();
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : '並べ替えられませんでした');
     }
   }
 
@@ -204,98 +232,134 @@ export function CategoriesPage() {
         </Card>
       )}
 
-      {scoped.map((group) => (
-        <Card key={group.key} className="flex flex-col gap-2">
-          <ScopeTag
-            label={workspace.scopeLabel({ share_group_id: group.shareGroupId })}
-            kind={group.shareGroupId === null ? 'own' : 'group'}
-          />
-          {group.items.map((category) => (
-            <div key={category.id} className="flex flex-wrap items-center justify-between gap-2">
-              <span className="flex items-center gap-2 text-sm">
-                {category.is_system ? (
-                  category.name
-                ) : (
-                  <TextInput
-                    aria-label={`${category.name}の名前`}
-                    className="w-28"
-                    defaultValue={category.name}
-                    key={category.name}
-                    onBlur={(e) => void rename(category.id, e.target.value)}
-                  />
-                )}
-                {!category.is_system && (
-                  <input
-                    type="color"
-                    aria-label={`${category.name}の色`}
-                    className="h-6 w-8 rounded border border-[var(--c-edge)]"
-                    defaultValue={category.color}
-                    key={`${category.id}-color`}
-                    onBlur={async (e) => {
-                      if (e.target.value === category.color) return;
-                      await updateCategory(category.id, { color: e.target.value });
-                      await workspace.reload();
-                    }}
-                  />
-                )}
-                {category.is_archived && (
-                  <span className="ml-1 text-xs text-[var(--c-muted)]">アーカイブ済み</span>
-                )}
-                {category.is_system && (
-                  <span className="ml-1 text-xs text-[var(--c-muted)]">（消せない）</span>
-                )}
-              </span>
-              {!category.is_system && (
-                <span className="flex items-center gap-2 text-xs">
-                  <select
-                    aria-label={`${category.name}の移動先`}
-                    className="rounded border border-[var(--c-edge)] bg-[var(--c-panel)] px-1 py-0.5"
-                    defaultValue=""
-                    onChange={(e) => {
-                      if (e.target.value !== '') void startMove(category.id, e.target.value, false);
-                    }}
-                  >
-                    <option value="">共有範囲を変える</option>
-                    <option value={OWN}>個人へ</option>
-                    {workspace.groups.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {g.name}へ
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      await updateCategory(category.id, { is_archived: !category.is_archived });
-                      await workspace.reload();
-                    }}
-                  >
-                    {category.is_archived ? '戻す' : 'アーカイブ'}
-                  </button>
-                  <button
-                    type="button"
-                    className="text-[var(--c-warn)]"
-                    onClick={async () => {
-                      setError('');
-                      try {
-                        await deleteCategory(category.id);
-                        await workspace.reload();
-                      } catch (failure) {
-                        setError(failure instanceof Error ? failure.message : '消せませんでした');
-                      }
-                    }}
-                  >
-                    削除
-                  </button>
-                </span>
-              )}
-            </div>
-          ))}
-        </Card>
-      ))}
+      {scoped.map((group) => {
+        // 未分類は常に末尾（sort_order 9999）なので並べ替えの対象から外す
+        const movable = group.items.filter((c) => !c.is_system);
+        return (
+          <Card key={group.key} className="flex flex-col gap-2">
+            <ScopeTag
+              label={workspace.scopeLabel({ share_group_id: group.shareGroupId })}
+              kind={group.shareGroupId === null ? 'own' : 'group'}
+            />
+            {group.items.map((category) => {
+              const index = movable.findIndex((c) => c.id === category.id);
+              return (
+                <div
+                  key={category.id}
+                  className="flex flex-wrap items-center justify-between gap-2"
+                >
+                  <span className="flex items-center gap-2 text-sm">
+                    {!category.is_system && (
+                      <span className="flex flex-col leading-none">
+                        <button
+                          type="button"
+                          aria-label={`${category.name}を上へ`}
+                          className="px-1 text-xs disabled:opacity-30"
+                          disabled={index === 0}
+                          onClick={() => void move(category.id, movable, 'up')}
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`${category.name}を下へ`}
+                          className="px-1 text-xs disabled:opacity-30"
+                          disabled={index === movable.length - 1}
+                          onClick={() => void move(category.id, movable, 'down')}
+                        >
+                          ▼
+                        </button>
+                      </span>
+                    )}
+                    {category.is_system ? (
+                      category.name
+                    ) : (
+                      <TextInput
+                        aria-label={`${category.name}の名前`}
+                        className="w-28"
+                        defaultValue={category.name}
+                        key={category.name}
+                        onBlur={(e) => void rename(category.id, e.target.value)}
+                      />
+                    )}
+                    {!category.is_system && (
+                      <input
+                        type="color"
+                        aria-label={`${category.name}の色`}
+                        className="h-6 w-8 rounded border border-[var(--c-edge)]"
+                        defaultValue={category.color}
+                        key={`${category.id}-color`}
+                        onBlur={async (e) => {
+                          if (e.target.value === category.color) return;
+                          await updateCategory(category.id, { color: e.target.value });
+                          await workspace.reload();
+                        }}
+                      />
+                    )}
+                    {category.is_archived && (
+                      <span className="ml-1 text-xs text-[var(--c-muted)]">アーカイブ済み</span>
+                    )}
+                    {category.is_system && (
+                      <span className="ml-1 text-xs text-[var(--c-muted)]">（消せない）</span>
+                    )}
+                  </span>
+                  {!category.is_system && (
+                    <span className="flex items-center gap-2 text-xs">
+                      <select
+                        aria-label={`${category.name}の移動先`}
+                        className="rounded border border-[var(--c-edge)] bg-[var(--c-panel)] px-1 py-0.5"
+                        defaultValue=""
+                        onChange={(e) => {
+                          if (e.target.value !== '')
+                            void startMove(category.id, e.target.value, false);
+                        }}
+                      >
+                        <option value="">共有範囲を変える</option>
+                        <option value={OWN}>個人へ</option>
+                        {workspace.groups.map((g) => (
+                          <option key={g.id} value={g.id}>
+                            {g.name}へ
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await updateCategory(category.id, { is_archived: !category.is_archived });
+                          await workspace.reload();
+                        }}
+                      >
+                        {category.is_archived ? '戻す' : 'アーカイブ'}
+                      </button>
+                      <button
+                        type="button"
+                        className="text-[var(--c-warn)]"
+                        onClick={async () => {
+                          setError('');
+                          try {
+                            await deleteCategory(category.id);
+                            await workspace.reload();
+                          } catch (failure) {
+                            setError(
+                              failure instanceof Error ? failure.message : '消せませんでした',
+                            );
+                          }
+                        }}
+                      >
+                        削除
+                      </button>
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </Card>
+        );
+      })}
 
       <Note>
-        削除すると、その取引は同じ共有範囲・同じ収支区分の未分類へ移る。未分類は消せない（§3.8）
+        削除すると、その取引は同じ共有範囲・同じ収支区分の未分類へ移る。未分類は消せない（§3.8）。
+        ▲▼ で並べ替えると、入力や集計でもその順に出る
       </Note>
     </main>
   );

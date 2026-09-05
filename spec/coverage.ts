@@ -23,7 +23,11 @@ const SOURCES: Record<string, string[]> = {
     'supabase/tests/01-basics.test.sql',
     'supabase/tests/04-groups.test.sql',
   ],
-  カテゴリの管理: ['e2e/category.spec.ts', 'src/features/categories/name.test.ts'],
+  カテゴリの管理: [
+    'e2e/category.spec.ts',
+    'src/features/categories/name.test.ts',
+    'src/features/categories/order.test.ts',
+  ],
   取引の入力と編集: [
     'e2e/transaction.spec.ts',
     'src/features/transactions/validation.test.ts',
