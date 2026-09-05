@@ -7,7 +7,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Button, Card, ErrorText, Field, Note, ScopeTag, Tabs, TextInput } from '../../components/ui';
+import { Button, Card, ErrorText, Field, ScopeTag, Tabs, TextInput } from '../../components/ui';
 import { formatAmount, parseAmount } from '../../lib/money';
 import { todayIso } from '../../lib/date';
 import { defaultSplits, fillRemainder, type Split } from '../../lib/split';
@@ -340,10 +340,6 @@ export function TransactionFormPage() {
           保存
         </Button>
       </div>
-
-      <Note>
-        個人カテゴリの支払者は本人だけ。共用は共有カテゴリでだけ選べる（§3.5）
-      </Note>
     </main>
   );
 }

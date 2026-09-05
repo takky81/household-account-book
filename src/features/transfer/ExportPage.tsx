@@ -1,7 +1,7 @@
 /** エクスポート画面（決定表「CSVエクスポート」）。期間を選べるのは取引と予算だけ。 */
 
 import { useState } from 'react';
-import { Button, Card, Note, Tabs } from '../../components/ui';
+import { Button, Card, Tabs } from '../../components/ui';
 import { currentMonthKey, monthEnd, monthStart } from '../../lib/date';
 import { loadBudgets, loadTransactions } from '../../lib/db';
 import { useWorkspace } from '../app/context';
@@ -125,8 +125,6 @@ export function ExportPage() {
 
         <Button onClick={() => void run()}>書き出す</Button>
       </Card>
-
-      <Note>参照できるレコードだけを書き出す。負担は常に明示する（§4.2）</Note>
     </main>
   );
 }
