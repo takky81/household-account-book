@@ -186,4 +186,24 @@ test.describe('取引の入力と編集', () => {
     await expect(signedIn.getByLabel('カテゴリ')).not.toHaveValue('');
     await expect(signedIn.getByLabel('金額')).toBeFocused();
   });
+
+  test('列13 編集では続けて入力できない', async ({ signedIn, users }) => {
+    const category = await systemCategoryOf(users.taro, 'expense');
+    const id = await seedTransaction({
+      categoryId: category,
+      payerId: users.taro,
+      createdBy: users.taro,
+      occurredOn: today(),
+      amount: 500,
+      memo: '直す取引',
+      splits: [{ userId: users.taro, amount: 500 }],
+    });
+
+    await signedIn.goto(`/transactions/${id}/edit`);
+    await expect(signedIn.getByLabel('備考')).toHaveValue('直す取引');
+
+    // 押せると同じ取引を上書きし続けてしまうので出さない
+    await expect(signedIn.getByRole('button', { name: '保存して続けて入力' })).toBeHidden();
+    await expect(signedIn.getByRole('button', { name: '保存', exact: true })).toBeVisible();
+  });
 });

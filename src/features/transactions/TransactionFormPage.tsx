@@ -318,9 +318,12 @@ export function TransactionFormPage() {
       {saved !== '' && <p className="text-xs text-[var(--c-income)]">{saved}</p>}
 
       <div className="flex gap-2">
-        <Button variant="ghost" className="flex-1" disabled={busy} onClick={() => void save(true)}>
-          保存して続けて入力
-        </Button>
+        {/* 続けて入力できるのは新規のときだけ。編集で押すと同じ取引を上書きし続けてしまう */}
+        {id === undefined && (
+          <Button variant="ghost" className="flex-1" disabled={busy} onClick={() => void save(true)}>
+            保存して続けて入力
+          </Button>
+        )}
         <Button className="flex-1" disabled={busy} onClick={() => void save(false)}>
           保存
         </Button>
