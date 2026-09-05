@@ -246,15 +246,15 @@ export function CategoriesPage() {
               return (
                 <div
                   key={category.id}
-                  className="flex flex-wrap items-center justify-between gap-2"
+                  className="flex items-center justify-between gap-2"
                 >
-                  <span className="flex items-center gap-2 text-sm">
+                  <span className="flex min-w-0 flex-1 items-center gap-1 text-sm">
                     {!category.is_system && (
                       <span className="flex flex-col leading-none">
                         <button
                           type="button"
                           aria-label={`${category.name}を上へ`}
-                          className="px-1 text-xs disabled:opacity-30"
+                          className="text-xs disabled:opacity-30"
                           disabled={index === 0}
                           onClick={() => void move(category.id, movable, 'up')}
                         >
@@ -263,7 +263,7 @@ export function CategoriesPage() {
                         <button
                           type="button"
                           aria-label={`${category.name}を下へ`}
-                          className="px-1 text-xs disabled:opacity-30"
+                          className="text-xs disabled:opacity-30"
                           disabled={index === movable.length - 1}
                           onClick={() => void move(category.id, movable, 'down')}
                         >
@@ -276,7 +276,7 @@ export function CategoriesPage() {
                     ) : (
                       <TextInput
                         aria-label={`${category.name}の名前`}
-                        className="w-28"
+                        className="w-full min-w-0"
                         defaultValue={category.name}
                         key={category.name}
                         onBlur={(e) => void rename(category.id, e.target.value)}
@@ -286,7 +286,7 @@ export function CategoriesPage() {
                       <input
                         type="color"
                         aria-label={`${category.name}の色`}
-                        className="h-6 w-8 rounded border border-[var(--c-edge)]"
+                        className="h-6 w-8 shrink-0 rounded border border-[var(--c-edge)]"
                         defaultValue={category.color}
                         key={`${category.id}-color`}
                         onBlur={async (e) => {
@@ -304,7 +304,7 @@ export function CategoriesPage() {
                     )}
                   </span>
                   {!category.is_system && (
-                    <span className="flex items-center gap-2 text-xs">
+                    <span className="flex shrink-0 items-center gap-1 text-xs">
                       <select
                         aria-label={`${category.name}の移動先`}
                         className="rounded border border-[var(--c-edge)] bg-[var(--c-panel)] px-1 py-0.5"
