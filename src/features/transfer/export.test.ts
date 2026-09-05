@@ -41,6 +41,25 @@ describe('transactionCsv', () => {
     });
   });
 
+  it('負担は読み込んだ順によらず表示名の順で並ぶ', () => {
+    const reversed = { ...tx, splits: [...tx.splits].reverse() };
+    const { rows } = parseCsvRows(transactionCsv([reversed], names, groups));
+    expect(rows[0]!.負担).toBe('たかし:60000;はなこ:60000');
+  });
+
+  it('表示名を引けない負担どうしは利用者IDの順で並ぶ', () => {
+    const unknown = {
+      ...tx,
+      splits: [
+        { userId: 'u4', amount: 40000 },
+        { userId: 'u3', amount: 20000 },
+        { userId: 'u1', amount: 60000 },
+      ],
+    };
+    const { rows } = parseCsvRows(transactionCsv([unknown], names, groups));
+    expect(rows[0]!.負担).toBe(':20000;:40000;たかし:60000');
+  });
+
   it('列3 支払者なしは共用と書く', () => {
     const { rows } = parseCsvRows(transactionCsv([tx], names, groups));
     expect(rows[0]!.支払者).toBe('共用');

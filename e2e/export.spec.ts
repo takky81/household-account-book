@@ -33,7 +33,8 @@ test.describe('CSVエクスポート', () => {
     expect(text.startsWith('﻿')).toBe(true);
     expect(text).toContain('\r\n');
     expect(text).toContain('日付,収支,共有範囲,カテゴリ,金額,支払者,負担,備考');
-    expect(text).toContain('2026-09-01,支出,夫婦,家賃,1000,共用,taro:500;hana:500,九月分');
+    // 負担は表示名の順に並ぶ（読み込んだ順は決まらない）
+    expect(text).toContain('2026-09-01,支出,夫婦,家賃,1000,共用,hana:500;taro:500,九月分');
   });
 
   test('列9 カテゴリの書き出しでは期間を選べない', async ({ signedIn, users }) => {

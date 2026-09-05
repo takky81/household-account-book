@@ -100,7 +100,19 @@ export function TransactionFormPage() {
       setMemo(tx.memo);
       setLoadedPayer(tx.payer_id ?? SHARED);
       if (tx.splits_are_manual) {
-        setManualSplits(tx.transaction_splits.map((s) => ({ userId: s.user_id, amount: s.amount })));
+        // 読み込んだ順は決まらないので、既定の按分と同じ並び（メンバーの順、
+        // 脱退した人は後ろ）に直す。そうしないと開くたびに行が入れ替わる
+        const order = new Map(
+          (found?.share_group_id != null ? workspace.membersOf(found.share_group_id) : []).map(
+            (m, index) => [m.userId, index],
+          ),
+        );
+        const rank = (userId: string) => order.get(userId) ?? order.size;
+        setManualSplits(
+          tx.transaction_splits
+            .map((s) => ({ userId: s.user_id, amount: s.amount }))
+            .sort((a, b) => rank(a.userId) - rank(b.userId) || (a.userId < b.userId ? -1 : 1)),
+        );
       }
     })();
   }, [id, workspace.categories]);

@@ -47,9 +47,22 @@ export type ExportTx = {
   memo: string;
 };
 
-/** 負担は `表示名:金額` を `;` で連結する。書き出しでは常に明示する（§4.2）。 */
+/**
+ * 負担は `表示名:金額` を `;` で連結する。書き出しでは常に明示する（§4.2）。
+ *
+ * 読み込んだ順は決まらないので表示名で並べる。表示名は一意（profiles_display_name_uq）
+ * だが、まだ読んでいない利用者は空文字になるため利用者IDで決着をつける。
+ */
 function splitsLabel(splits: ExportTx['splits'], names: Names): string {
-  return splits.map((s) => `${names[s.userId] ?? ''}:${s.amount}`).join(';');
+  const label = (userId: string) => names[userId] ?? '';
+  return [...splits]
+    .sort((a, b) => {
+      const [x, y] = [label(a.userId), label(b.userId)];
+      if (x !== y) return x < y ? -1 : 1;
+      return a.userId < b.userId ? -1 : 1;
+    })
+    .map((s) => `${label(s.userId)}:${s.amount}`)
+    .join(';');
 }
 
 export function transactionCsv(rows: ExportTx[], names: Names, groupNames: Names): string {
