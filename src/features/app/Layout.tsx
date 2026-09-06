@@ -14,39 +14,49 @@ const NAV = [
   { to: '/settings', label: '設定', end: false },
 ];
 
+/** 端末下端のホームバー／ブラウザのバーと重ならないよう空ける余白。 */
+const SAFE_BOTTOM = 'max(env(safe-area-inset-bottom), 0.75rem)';
+
 export function Layout() {
   // スマートフォンでの入力を主用途とする。狭いときは親指の届く下、広いときは上に置く（列3 / §6）
   const narrow = useNarrow();
-  const links = NAV.map((item) => (
-    <NavLink
-      key={item.to}
-      to={item.to}
-      end={item.end}
-      className={({ isActive }) =>
-        cn('px-2', isActive ? 'font-bold text-[var(--c-ink)]' : 'text-[var(--c-muted)]')
-      }
-    >
-      {item.label}
-    </NavLink>
-  ));
+  const renderLinks = (itemClass: string) =>
+    NAV.map((item) => (
+      <NavLink
+        key={item.to}
+        to={item.to}
+        end={item.end}
+        className={({ isActive }) =>
+          cn(itemClass, isActive ? 'font-bold text-[var(--c-ink)]' : 'text-[var(--c-muted)]')
+        }
+      >
+        {item.label}
+      </NavLink>
+    ));
 
   return (
-    <div className={cn('min-h-screen', narrow && 'pb-16')}>
+    <div
+      className="min-h-screen"
+      // 下ナビの高さぶん本文を空ける（固定配置なので場所を取らない）
+      style={narrow ? { paddingBottom: `calc(3.25rem + ${SAFE_BOTTOM})` } : undefined}
+    >
       {!narrow && (
         <nav
           data-testid="nav-top"
           className="sticky top-0 z-10 flex justify-center gap-4 border-b border-[var(--c-line)] bg-[var(--c-panel)] py-2 text-sm"
         >
-          {links}
+          {renderLinks('px-2')}
         </nav>
       )}
       <Outlet />
       {narrow && (
         <nav
           data-testid="nav-bottom"
-          className="fixed inset-x-0 bottom-0 flex justify-around border-t border-[var(--c-line)] bg-[var(--c-panel)] py-2 text-xs"
+          className="fixed inset-x-0 bottom-0 flex justify-around border-t border-[var(--c-line)] bg-[var(--c-panel)] pt-2 text-xs"
+          // 画面の最下端はブラウザのバーを呼び出す領域なので、リンクをそこまで広げない
+          style={{ paddingBottom: SAFE_BOTTOM }}
         >
-          {links}
+          {renderLinks('flex flex-1 items-center justify-center px-2 py-1.5')}
         </nav>
       )}
     </div>
