@@ -10,12 +10,18 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabase';
-import { loadWorkspace, type Workspace } from '../../lib/db';
+import {
+  loadWorkspace,
+  runRecurringRules,
+  type RecurringRunResult,
+  type Workspace,
+} from '../../lib/db';
 import { scopeKey } from '../categories/name';
 import { categoryPath, type TreeCategory } from '../categories/tree';
 import { toTreeCategory } from './model';
@@ -67,6 +73,10 @@ export type WorkspaceState = Workspace & {
   tree: TreeCategory[];
   /** 表示名。小分類は『大分類 / 小分類』（§3.4.1） */
   categoryPath: (id: string) => string;
+  /** 起動時、または手で実行した定期登録の結果（§5.8）。まだ実行していなければ null */
+  recurringResult: RecurringRunResult | null;
+  /** 定期登録を今すぐ実行する（設定画面の手動実行） */
+  runRecurring: () => Promise<RecurringRunResult>;
 };
 
 const WorkspaceContext = createContext<WorkspaceState | null>(null);
@@ -76,15 +86,39 @@ const empty: Workspace = { profiles: [], groups: [], members: [], categories: []
 export function WorkspaceProvider({ children, userId }: { children: ReactNode; userId: string }) {
   const [data, setData] = useState<Workspace>(empty);
   const [ready, setReady] = useState(false);
+  const [recurringResult, setRecurringResult] = useState<RecurringRunResult | null>(null);
 
   const reload = useCallback(async () => {
     setData(await loadWorkspace());
     setReady(true);
   }, []);
 
+  const runRecurring = useCallback(async () => {
+    const result = await runRecurringRules();
+    setRecurringResult(result);
+    return result;
+  }, []);
+
+  /**
+   * 起動時の実行は1回だけ。2回目は必ず「作るものなし」を返すので、
+   * そのまま上書きすると1回目に登録した件数の知らせが消える（StrictMode の再実行を含む）。
+   */
+  const started = useRef(false);
+
   useEffect(() => {
-    void reload();
-  }, [reload]);
+    if (started.current) return;
+    started.current = true;
+    void (async () => {
+      // 期日の来た定期登録を先に取引にしてから画面を出す（§5.8）。
+      // 後回しにすると、生成した当月ぶんが最初のホーム画面に出ない
+      try {
+        await runRecurring();
+      } catch {
+        // 生成に失敗しても家計簿は開けるようにする。失敗の中身は RPC 側で数える
+      }
+      await reload();
+    })();
+  }, [reload, runRecurring]);
 
   const value = useMemo<WorkspaceState>(() => {
     const membersOf = (shareGroupId: string): MemberLike[] =>
@@ -108,6 +142,8 @@ export function WorkspaceProvider({ children, userId }: { children: ReactNode; u
         const found = byId.get(id);
         return found === undefined ? '' : categoryPath(tree, found);
       },
+      recurringResult,
+      runRecurring,
       myGroupIds: data.members.filter((m) => m.user_id === userId).map((m) => m.share_group_id),
       displayName: (id) =>
         id === null ? '共用' : (data.profiles.find((p) => p.id === id)?.display_name ?? '不明'),
@@ -117,7 +153,7 @@ export function WorkspaceProvider({ children, userId }: { children: ReactNode; u
           ? '個人'
           : (data.groups.find((g) => g.id === item.share_group_id)?.name ?? '不明'),
     };
-  }, [data, reload, userId]);
+  }, [data, reload, recurringResult, runRecurring, userId]);
 
   if (!ready) return <p className="p-6 text-sm text-[var(--c-muted)]">読み込んでいます…</p>;
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;

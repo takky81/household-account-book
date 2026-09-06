@@ -6,6 +6,7 @@ import { Button, Card, ErrorText, Field, Note, Select, TextInput } from '../../c
 import { supabase } from '../../lib/supabase';
 import { updateProfile } from '../../lib/db';
 import { useAuth, useWorkspace } from '../app/context';
+import { describeRecurringRun } from '../recurring/schedule';
 import { applyTheme, loadTheme, resolveTheme, saveTheme, type ThemeSetting } from '../../lib/theme';
 import {
   CURRENT_PASSWORD_WRONG,
@@ -29,10 +30,27 @@ export function SettingsPage() {
   const [passwordError, setPasswordError] = useState('');
   const [changed, setChanged] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [ran, setRan] = useState('');
 
   useEffect(() => {
     applyTheme(resolveTheme(setting, window.matchMedia('(prefers-color-scheme: dark)').matches));
   }, [setting]);
+
+  /** 定期登録の手動実行（§5.8）。起動時と同じ RPC を呼ぶ */
+  async function runNow() {
+    if (running) return;
+    setRunning(true);
+    setRan('');
+    try {
+      const result = await workspace.runRecurring();
+      setRan(describeRecurringRun(result));
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : '実行できませんでした');
+    } finally {
+      setRunning(false);
+    }
+  }
 
   async function patch(next: Parameters<typeof updateProfile>[1]) {
     setError('');
@@ -120,6 +138,21 @@ export function SettingsPage() {
       </Card>
 
       <Card className="flex flex-col gap-2">
+        <h2 className="text-sm font-bold">定期登録</h2>
+        <p className="text-xs text-[var(--c-muted)]">
+          期日の来たルールはアプリを開いたときに登録されます。今すぐ確かめたいときに使います
+        </p>
+        <Button variant="ghost" disabled={running} onClick={() => void runNow()}>
+          定期登録を今すぐ実行
+        </Button>
+        {ran !== '' && (
+          <p role="status" data-testid="recurring-run" className="text-xs text-[var(--c-muted)]">
+            {ran}
+          </p>
+        )}
+      </Card>
+
+      <Card className="flex flex-col gap-2">
         <h2 className="text-sm font-bold">表示</h2>
         <div className="flex gap-2">
           {(
@@ -192,6 +225,9 @@ export function SettingsPage() {
         </Link>
         <Link className="text-sm text-[var(--c-link)]" to="/groups">
           共有グループ
+        </Link>
+        <Link className="text-sm text-[var(--c-link)]" to="/recurring">
+          定期登録
         </Link>
         <Link className="text-sm text-[var(--c-link)]" to="/import">
           インポート

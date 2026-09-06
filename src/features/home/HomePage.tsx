@@ -11,6 +11,7 @@ import { useAuth, useWorkspace } from '../app/context';
 import { aggregateMonth, monthDiff } from '../aggregate/aggregate';
 import { actualsByCategory, selfBurdenByCategory, toAggregateTx } from '../app/model';
 import { buildBudgetRows } from '../budgets/usage';
+import { describeRecurringRun } from '../recurring/schedule';
 
 export function HomePage() {
   const workspace = useWorkspace();
@@ -67,10 +68,27 @@ export function HomePage() {
   }).filter((row) => row.budget !== null);
 
   const recent = current.slice(0, 5);
+  const recurring = workspace.recurringResult;
 
   return (
     <main className="mx-auto flex max-w-md flex-col gap-3 p-3">
       <MonthNav monthKey={monthKey} onChange={setMonthKey} />
+
+      {/* 起動時に作った取引を知らせる。黙って増やすと覚えのない取引に見える（§5.8） */}
+      {recurring !== null && recurring.created + recurring.failed > 0 && (
+        <p
+          role="status"
+          data-testid="recurring-notice"
+          className="rounded-md border border-[var(--c-line)] bg-[var(--c-panel)] px-2 py-1 text-xs text-[var(--c-muted)]"
+        >
+          {describeRecurringRun(recurring)}
+          {recurring.failed > 0 && (
+            <Link className="ml-1 text-[var(--c-link)]" to="/recurring">
+              定期登録を見る
+            </Link>
+          )}
+        </p>
+      )}
 
       <Card>
         <div className="flex justify-between text-sm">

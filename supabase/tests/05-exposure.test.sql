@@ -26,9 +26,11 @@ select set_eq(
     'import_transactions',
     'delete_category',
     'move_category_scope',
-    'move_transactions'
+    'move_transactions',
+    'upsert_recurring_rule',
+    'run_recurring_rules'
   ],
-  'REST から叩ける SECURITY DEFINER 関数は書き込み用の RPC 9本だけ'
+  'REST から叩ける SECURITY DEFINER 関数は書き込み用の RPC 11本だけ'
 );
 
 select ok(
@@ -45,7 +47,7 @@ select ok(
 -- 上の検査が本当に効いているか。public へ戻すと増えることを見る（この変更は rollback される）
 alter function private.is_group_member_of(uuid, uuid) set schema public;
 select is(
-  (select count(*)::int from exposed), 10,
+  (select count(*)::int from exposed), 12,
   '判定関数を public へ戻すと、さらされる関数として数えられる'
 );
 

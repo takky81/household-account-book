@@ -15,6 +15,7 @@ import { AggregatePage } from './features/aggregate/AggregatePage';
 import { BudgetPage } from './features/budgets/BudgetPage';
 import { CategoriesPage } from './features/categories/CategoriesPage';
 import { GroupsPage } from './features/groups/GroupsPage';
+import { RecurringPage } from './features/recurring/RecurringPage';
 import { ImportPage } from './features/transfer/ImportPage';
 import { ExportPage } from './features/transfer/ExportPage';
 import { SettingsPage } from './features/settings/SettingsPage';
@@ -51,6 +52,7 @@ function Routed() {
           <Route path="/budget" element={<BudgetPage />} />
           <Route path="/categories" element={<CategoriesPage />} />
           <Route path="/groups" element={<GroupsPage />} />
+          <Route path="/recurring" element={<RecurringPage />} />
           <Route path="/import" element={<ImportPage />} />
           <Route path="/export" element={<ExportPage />} />
           <Route path="/settings" element={<SettingsPage />} />

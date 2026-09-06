@@ -58,6 +58,16 @@ const SOURCES: Record<string, string[]> = {
     'supabase/tests/01-basics.test.sql',
     'supabase/tests/02-access.test.sql',
   ],
+  定期登録ルールの管理: [
+    'e2e/recurring.spec.ts',
+    'src/features/recurring/validation.test.ts',
+    'supabase/tests/07-recurring.test.sql',
+  ],
+  定期登録の生成: [
+    'e2e/recurring.spec.ts',
+    'src/features/recurring/schedule.test.ts',
+    'supabase/tests/07-recurring.test.sql',
+  ],
   表示設定と共通の振る舞い: [
     'e2e/ui.spec.ts',
     'src/lib/theme.test.ts',

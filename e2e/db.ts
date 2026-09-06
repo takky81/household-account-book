@@ -64,14 +64,16 @@ export async function ensureUsers(): Promise<TestUsers> {
 }
 
 /**
- * 前回の残りを消す。取引 → 予算 → 未分類以外のカテゴリ → グループ の順。
- * transactions.category_id は restrict なので、取引を先に消さないとカテゴリを消せない。
+ * 前回の残りを消す。取引 → 定期登録ルール → 予算 → 未分類以外のカテゴリ → グループ の順。
+ * transactions.category_id と recurring_rules.category_id は restrict なので、
+ * どちらも先に消さないとカテゴリを消せない。
  */
 export async function resetData(): Promise<void> {
   const db = adminClient();
   const all = '00000000-0000-0000-0000-000000000000';
   for (const step of [
     db.from('transactions').delete().neq('id', all),
+    db.from('recurring_rules').delete().neq('id', all),
     db.from('budgets').delete().neq('id', all),
     db.from('categories').delete().eq('is_system', false),
     db.from('share_groups').delete().neq('id', all),
@@ -188,4 +190,81 @@ export async function systemCategoryOf(ownerId: string, kind: 'income' | 'expens
     .single();
   if (error !== null) throw error;
   return data.id as string;
+}
+
+/** 定期登録ルールを1件作る（§3.8）。created_by は既定値が入らないので必ず渡す。 */
+export async function seedRecurringRule(input: {
+  categoryId: string;
+  createdBy: string;
+  payerId: string | null;
+  amount: number;
+  dayOfMonth: number;
+  /** 対象月（YYYY-MM）。DB には月初の日付で入れる */
+  startMonth: string;
+  endMonth?: string | null;
+  memo?: string;
+  isPaused?: boolean;
+  splits?: { userId: string; amount: number }[];
+}): Promise<string> {
+  const db = adminClient();
+  const rule = await db
+    .from('recurring_rules')
+    .insert({
+      category_id: input.categoryId,
+      created_by: input.createdBy,
+      payer_id: input.payerId,
+      amount: input.amount,
+      day_of_month: input.dayOfMonth,
+      start_month: `${input.startMonth}-01`,
+      end_month: input.endMonth == null ? null : `${input.endMonth}-01`,
+      memo: input.memo ?? '',
+      is_paused: input.isPaused ?? false,
+      splits_are_manual: input.splits !== undefined,
+    })
+    .select('id')
+    .single();
+  if (rule.error !== null) throw rule.error;
+  const id = rule.data.id as string;
+  if (input.splits !== undefined) {
+    const splits = await db
+      .from('recurring_rule_splits')
+      .insert(input.splits.map((s) => ({ rule_id: id, user_id: s.userId, amount: s.amount })));
+    if (splits.error !== null) throw splits.error;
+  }
+  return id;
+}
+
+export async function countTransactions(categoryId: string): Promise<number> {
+  const { count, error } = await adminClient()
+    .from('transactions')
+    .select('id', { count: 'exact', head: true })
+    .eq('category_id', categoryId);
+  if (error !== null) throw error;
+  return count ?? 0;
+}
+
+export async function countRecurringPostings(ruleId: string): Promise<number> {
+  const { count, error } = await adminClient()
+    .from('recurring_postings')
+    .select('rule_id', { count: 'exact', head: true })
+    .eq('rule_id', ruleId);
+  if (error !== null) throw error;
+  return count ?? 0;
+}
+
+/** 生成された取引を消す（意図して消したものが戻らないことを確かめる）。 */
+export async function deleteTransactionsOf(categoryId: string): Promise<void> {
+  const { error } = await adminClient()
+    .from('transactions')
+    .delete()
+    .eq('category_id', categoryId);
+  if (error !== null) throw error;
+}
+
+export async function archiveCategory(categoryId: string): Promise<void> {
+  const { error } = await adminClient()
+    .from('categories')
+    .update({ is_archived: true })
+    .eq('id', categoryId);
+  if (error !== null) throw error;
 }

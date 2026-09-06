@@ -55,6 +55,36 @@ export type Transaction = {
 
 export type Budget = { id: string; category_id: string; month: string; amount: number };
 
+/** 定期登録ルール（§3.8）。負担の雛形は splits_are_manual のときだけ行を持つ */
+export type RecurringRule = {
+  id: string;
+  category_id: string;
+  payer_id: string | null;
+  created_by: string;
+  amount: number;
+  day_of_month: number;
+  memo: string;
+  /** 月初の日付（YYYY-MM-01）。画面では対象月（YYYY-MM）に直して扱う */
+  start_month: string;
+  end_month: string | null;
+  is_paused: boolean;
+  splits_are_manual: boolean;
+  recurring_rule_splits: { user_id: string; amount: number }[];
+};
+
+/** 生成の記録（§3.9）。取引を消しても残るので、生成済みかはこの表で決まる */
+export type RecurringPosting = {
+  rule_id: string;
+  month: string;
+  transaction_id: string | null;
+};
+
+export type RecurringRunResult = {
+  created: number;
+  failed: number;
+  failures: { rule_id: string; month: string; message: string }[];
+};
+
 /** 画面をまたいで使う、量の少ないデータ。ログインのたびにまとめて読む。 */
 export type Workspace = {
   profiles: Profile[];
@@ -121,6 +151,24 @@ export async function loadBudgets(monthKeys: string[]): Promise<Budget[]> {
   return (data ?? []) as Budget[];
 }
 
+export async function loadRecurringRules(): Promise<RecurringRule[]> {
+  const { data, error } = await supabase
+    .from('recurring_rules')
+    .select('*, recurring_rule_splits(user_id, amount)')
+    .order('day_of_month')
+    .order('id');
+  if (error !== null) throw new Error(error.message);
+  return (data ?? []) as RecurringRule[];
+}
+
+export async function loadRecurringPostings(): Promise<RecurringPosting[]> {
+  const { data, error } = await supabase
+    .from('recurring_postings')
+    .select('rule_id, month, transaction_id');
+  if (error !== null) throw new Error(error.message);
+  return (data ?? []) as RecurringPosting[];
+}
+
 // ------------------------------------------------------------------ 書き込み
 
 export type SaveTransaction = {
@@ -154,6 +202,54 @@ export async function saveTransaction(input: SaveTransaction): Promise<string> {
 export async function deleteTransaction(id: string): Promise<void> {
   const { error } = await supabase.from('transactions').delete().eq('id', id);
   if (error !== null) throw new Error(error.message);
+}
+
+export type SaveRecurringRule = {
+  id?: string;
+  categoryId: string;
+  amount: number;
+  dayOfMonth: number;
+  /** 対象月（YYYY-MM）。RPC には月初の日付として渡す */
+  startMonth: string;
+  endMonth: string | null;
+  payerId: string | null;
+  memo: string;
+  isPaused: boolean;
+  /** 渡すと手入力の雛形として扱う。省略すると生成のたびに既定按分する（§3.9） */
+  splits?: Split[];
+};
+
+export async function saveRecurringRule(input: SaveRecurringRule): Promise<string> {
+  const { data, error } = await supabase.rpc('upsert_recurring_rule', {
+    p_category_id: input.categoryId,
+    p_amount: input.amount,
+    p_day_of_month: input.dayOfMonth,
+    p_start_month: monthStart(input.startMonth),
+    p_payer_id: input.payerId,
+    p_memo: input.memo,
+    p_end_month: input.endMonth === null ? null : monthStart(input.endMonth),
+    p_is_paused: input.isPaused,
+    p_splits:
+      input.splits === undefined
+        ? null
+        : input.splits.map((s) => ({ user_id: s.userId, amount: s.amount })),
+    p_id: input.id ?? null,
+  });
+  if (error !== null) throw new Error(error.message);
+  return data as string;
+}
+
+/** ルールを消す。雛形と生成の記録はカスケードで消え、作った取引は残る（§3.10）。 */
+export async function deleteRecurringRule(id: string): Promise<void> {
+  const { error } = await supabase.from('recurring_rules').delete().eq('id', id);
+  if (error !== null) throw new Error(error.message);
+}
+
+/** 期日の来た定期登録を取引にする（§5.8）。今日は DB 側の current_date で決まる。 */
+export async function runRecurringRules(): Promise<RecurringRunResult> {
+  const { data, error } = await supabase.rpc('run_recurring_rules', { p_today: null });
+  if (error !== null) throw new Error(error.message);
+  return data as RecurringRunResult;
 }
 
 export async function createCategory(input: {
