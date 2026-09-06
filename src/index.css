@@ -67,3 +67,16 @@ body {
   background: var(--c-paper);
   color: var(--c-ink);
 }
+
+/*
+ * iOS Safari は文字が16px未満の入力欄にフォーカスすると画面を勝手に拡大する。
+ * 指で触る端末に限って入力欄の文字を16pxまで底上げし、拡大を起こさせない。
+ * （maximum-scale で拡大そのものを禁じると、指で広げて読むこともできなくなる）
+ */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: max(16px, 1em);
+  }
+}
