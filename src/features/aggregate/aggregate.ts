@@ -167,3 +167,49 @@ export function monthDiff(current: MonthTotals, previous: MonthTotals): number {
 export function scopeOf(tx: { shareGroupId: string | null; ownerId: string | null }): string {
   return scopeKey(tx.shareGroupId, tx.ownerId);
 }
+
+/** 円グラフの色数（src/index.css の --c-cat-*）。最後の1色は「その他」に使う。 */
+export const PIE_COLORS = 7;
+
+export type Slice = {
+  /** カテゴリ行と同じ鍵。まとめた分は 'other' */
+  key: string;
+  name: string;
+  amount: number;
+  /** 全体に占める割合（0〜1） */
+  ratio: number;
+  /** --c-cat-n の n */
+  colorIndex: number;
+};
+
+/**
+ * カテゴリ別の内訳を円グラフ用に切り分ける（§5.5）。
+ * 色で見分けられる数に限りがあるので、上位 PIE_COLORS-1 件までを出し、残りは「その他」にまとめる。
+ */
+export function categorySlices(rows: CategoryTotal[]): Slice[] {
+  const positive = rows.filter((row) => row.amount > 0);
+  const total = positive.reduce((sum, row) => sum + row.amount, 0);
+  if (total === 0) return [];
+
+  const head = positive.slice(0, PIE_COLORS - 1);
+  const tail = positive.slice(PIE_COLORS - 1);
+  const slices = head.map((row, i) => ({
+    key: row.categoryId,
+    name: row.name,
+    amount: row.amount,
+    ratio: row.amount / total,
+    colorIndex: i + 1,
+  }));
+
+  if (tail.length > 0) {
+    const amount = tail.reduce((sum, row) => sum + row.amount, 0);
+    slices.push({
+      key: 'other',
+      name: 'その他',
+      amount,
+      ratio: amount / total,
+      colorIndex: PIE_COLORS,
+    });
+  }
+  return slices;
+}

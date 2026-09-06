@@ -36,6 +36,15 @@
   --c-own-panel: #fdf3e3;
   --c-bar: #4a6fa5; /* 棒グラフ・予算バー */
   --c-bar-track: #dde7f5;
+
+  /* 円グラフのカテゴリ色。並び順は固定で、使い回さない */
+  --c-cat-1: #2a78d6;
+  --c-cat-2: #eb6834;
+  --c-cat-3: #1baf7a;
+  --c-cat-4: #eda100;
+  --c-cat-5: #e87ba4;
+  --c-cat-6: #008300;
+  --c-cat-7: #4a3aa7; /* その他 */
 }
 
 .dark {
@@ -61,6 +70,14 @@
   --c-own-panel: #3a2f1a;
   --c-bar: #7fa6dd;
   --c-bar-track: #24354a;
+
+  --c-cat-1: #3987e5;
+  --c-cat-2: #d95926;
+  --c-cat-3: #199e70;
+  --c-cat-4: #c98500;
+  --c-cat-5: #d55181;
+  --c-cat-6: #008300;
+  --c-cat-7: #9085e9;
 }
 
 body {

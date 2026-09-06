@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { SHARED_PAYER, aggregateMonth, monthDiff, targetUsers, type AggregateTx } from './aggregate';
+import {
+  PIE_COLORS,
+  SHARED_PAYER,
+  aggregateMonth,
+  categorySlices,
+  monthDiff,
+  targetUsers,
+  type AggregateTx,
+  type CategoryTotal,
+} from './aggregate';
 
 const 夫婦 = 'g1';
 const taro = 'u1';
@@ -223,5 +232,34 @@ describe('monthDiff', () => {
     const current = aggregateMonth({ ...common, monthKey: '2026-08' });
     const previous = aggregateMonth({ ...common, monthKey: '2026-07' });
     expect(monthDiff(current, previous)).toBe(124200 - 100000);
+  });
+});
+
+describe('categorySlices', () => {
+  const category = (id: string, amount: number): CategoryTotal => ({
+    categoryId: id,
+    name: id,
+    scopeLabel: 'individual',
+    shareGroupId: null,
+    amount,
+  });
+
+  it('割合と色の番号を付けて返す', () => {
+    const slices = categorySlices([category('a', 3000), category('b', 1000)]);
+    expect(slices).toEqual([
+      { key: 'a', name: 'a', amount: 3000, ratio: 0.75, colorIndex: 1 },
+      { key: 'b', name: 'b', amount: 1000, ratio: 0.25, colorIndex: 2 },
+    ]);
+  });
+
+  it('色数を超えた分は「その他」にまとめる', () => {
+    const rows = Array.from({ length: PIE_COLORS + 3 }, (_, i) => category(`c${i}`, 100));
+    const slices = categorySlices(rows);
+    expect(slices).toHaveLength(PIE_COLORS);
+    expect(slices.at(-1)).toMatchObject({ key: 'other', name: 'その他', amount: 400 });
+  });
+
+  it('取引が無い月は空で返す', () => {
+    expect(categorySlices([])).toEqual([]);
   });
 });
