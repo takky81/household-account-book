@@ -45,7 +45,7 @@ export function Field({
 }: {
   label: string;
   children: ReactNode;
-  hint?: string;
+  hint?: ReactNode;
 }) {
   return (
     <label className="flex flex-col gap-1">

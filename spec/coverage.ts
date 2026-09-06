@@ -31,6 +31,7 @@ const SOURCES: Record<string, string[]> = {
   取引の入力と編集: [
     'e2e/transaction.spec.ts',
     'src/features/transactions/validation.test.ts',
+    'src/lib/money.test.ts',
     'supabase/tests/02-access.test.sql',
   ],
   負担の按分: ['src/lib/split.test.ts', 'e2e/transaction.spec.ts', 'supabase/tests/01-basics.test.sql'],

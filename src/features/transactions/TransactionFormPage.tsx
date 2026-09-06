@@ -8,7 +8,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Card, ErrorText, Field, ScopeTag, Tabs, TextInput } from '../../components/ui';
-import { formatAmount, parseAmount } from '../../lib/money';
+import {
+  evaluateExpression,
+  formatAmount,
+  isAmountExpression,
+  parseAmountInput,
+} from '../../lib/money';
 import { todayIso, weekdayOf } from '../../lib/date';
 import { defaultSplits, fillRemainder, type Split } from '../../lib/split';
 import { saveTransaction, type Transaction } from '../../lib/db';
@@ -18,6 +23,16 @@ import { validateTransaction } from './validation';
 import type { Kind } from '../categories/name';
 
 const SHARED = '__shared__';
+
+/** 金額欄に入れられる演算子。見た目は読みやすい記号、入れるのは計算に使う文字 */
+const OPERATORS = [
+  { label: '＋', insert: '+' },
+  { label: '−', insert: '-' },
+  { label: '×', insert: '*' },
+  { label: '÷', insert: '/' },
+  { label: '(', insert: '(' },
+  { label: ')', insert: ')' },
+];
 
 export function TransactionFormPage() {
   const { id } = useParams();
@@ -48,7 +63,7 @@ export function TransactionFormPage() {
     [category?.share_group_id, workspace],
   );
   const memberIds = isPersonal ? [selfId] : members.map((m) => m.userId);
-  const amount = parseAmount(amountText) ?? 0;
+  const amount = parseAmountInput(amountText) ?? 0;
   const payerId = payer === SHARED ? null : payer;
 
   // 既定の負担。カテゴリ・金額・支払者が変わるたびに引き直す（§5.1）
@@ -124,12 +139,38 @@ export function TransactionFormPage() {
 
   const categoriesOfKind = workspace.categories.filter((c) => c.kind === kind && !c.is_archived);
 
+  // 式のときだけ計算結果を欄の下に出す。ただの数字なら何も出さない（列16）
+  const isExpression = amountText.trim() !== '' && isAmountExpression(amountText);
+  const exact = isExpression ? evaluateExpression(amountText) : null;
+  const amountHint = !isExpression ? undefined : amount <= 0 || exact === null ? (
+    <span className="text-[var(--c-warn)]">計算できません</span>
+  ) : (
+    `= ${formatAmount(amount)}${Number.isInteger(exact) ? '' : '（四捨五入）'}`
+  );
+
+  /** 演算子をカーソル位置に入れる。入力欄の外のボタンから呼ぶ（列16） */
+  function insertIntoAmount(text: string) {
+    const input = amountRef.current;
+    const start = input?.selectionStart ?? amountText.length;
+    const end = input?.selectionEnd ?? start;
+    setAmountText(amountText.slice(0, start) + text + amountText.slice(end));
+    setManualSplits(null);
+    if (input === null) return;
+    input.focus();
+    // 値の反映後にカーソルを入れた文字の後ろへ動かす
+    requestAnimationFrame(() => input.setSelectionRange(start + text.length, start + text.length));
+  }
+
   async function save(again: boolean) {
     setError('');
     setSaved('');
-    const parsed = parseAmount(amountText);
+    const parsed = parseAmountInput(amountText);
     if (category === null || parsed === null) {
-      setError('カテゴリと金額を入れてください');
+      setError(
+        category !== null && isAmountExpression(amountText)
+          ? '金額の式を計算できません'
+          : 'カテゴリと金額を入れてください',
+      );
       return;
     }
     const check = validateTransaction({
@@ -234,7 +275,7 @@ export function TransactionFormPage() {
         </div>
       )}
 
-      <Field label="金額">
+      <Field label="金額" hint={amountHint}>
         <TextInput
           ref={amountRef}
           inputMode="numeric"
@@ -246,6 +287,22 @@ export function TransactionFormPage() {
           }}
         />
       </Field>
+
+      {/* スマホの数字キーボードには演算子が無いので、押して入れられるようにする（列16） */}
+      <div className="flex gap-1">
+        {OPERATORS.map((op) => (
+          <Button
+            key={op.insert}
+            variant="ghost"
+            aria-label={op.label}
+            className="w-9 px-0 text-center"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => insertIntoAmount(op.insert)}
+          >
+            {op.label}
+          </Button>
+        ))}
+      </div>
 
       {!isPersonal && members.length > 0 && (
         <Field label="支払者">

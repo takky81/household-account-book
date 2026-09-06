@@ -206,4 +206,45 @@ test.describe('取引の入力と編集', () => {
     await expect(signedIn.getByRole('button', { name: '保存して続けて入力' })).toBeHidden();
     await expect(signedIn.getByRole('button', { name: '保存', exact: true })).toBeVisible();
   });
+
+  test('列16 金額に式を入れると結果が欄の下に出て、その値で保存される', async ({
+    signedIn,
+    users,
+  }) => {
+    await seedCategory({ ownerId: users.taro, name: '外食' });
+
+    await signedIn.goto('/new');
+    await signedIn.getByLabel('カテゴリ').selectOption({ label: '個人 / 外食' });
+    await signedIn.getByLabel('金額').fill('1200+800');
+    await expect(signedIn.getByText('= 2,000')).toBeVisible();
+
+    await signedIn.getByRole('button', { name: '保存', exact: true }).click();
+    await expect(signedIn.getByRole('heading', { name: '取引一覧' })).toBeVisible();
+    expect((await latestTransaction()).amount).toBe(2000);
+  });
+
+  test('列16 演算子ボタンで式を組み立てられる', async ({ signedIn, users }) => {
+    await seedCategory({ ownerId: users.taro, name: '交通費' });
+
+    await signedIn.goto('/new');
+    await signedIn.getByLabel('カテゴリ').selectOption({ label: '個人 / 交通費' });
+    await signedIn.getByLabel('金額').fill('420');
+    await signedIn.getByRole('button', { name: '×' }).click();
+    await signedIn.getByLabel('金額').pressSequentially('3');
+    await expect(signedIn.getByLabel('金額')).toHaveValue('420*3');
+    await expect(signedIn.getByText('= 1,260')).toBeVisible();
+  });
+
+  test('列17 計算できない式では保存できない', async ({ signedIn, users }) => {
+    await seedCategory({ ownerId: users.taro, name: '雑貨' });
+
+    await signedIn.goto('/new');
+    await signedIn.getByLabel('カテゴリ').selectOption({ label: '個人 / 雑貨' });
+    await signedIn.getByLabel('金額').fill('1200+');
+    await expect(signedIn.getByText('計算できません')).toBeVisible();
+
+    await signedIn.getByRole('button', { name: '保存', exact: true }).click();
+    await expect(signedIn.getByRole('alert')).toBeVisible();
+    await expect(signedIn.getByRole('heading', { name: '取引を入力' })).toBeVisible();
+  });
 });
