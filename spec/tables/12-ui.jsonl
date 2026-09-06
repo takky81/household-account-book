@@ -5,3 +5,4 @@
 {"table": "表示設定と共通の振る舞い", "col": 5, "conditions": {"true": ["配信:GitHub Pages のサブパス"]}, "actions": {"true": ["画面の URL を直接開く"]}, "results": {"true": ["画面:その画面が開く"], "false": ["画面:404 になる"]}, "e2e": ["ui.spec: 直リンクで画面を開ける"], "note": "Vite の base とルータの basename を合わせ、404.html を置く（§2.2）"}
 {"table": "表示設定と共通の振る舞い", "col": 6, "conditions": {"true": ["通信:失敗する"]}, "actions": {"true": ["保存する"]}, "results": {"true": ["画面:エラーを表示する", "画面:入力内容を保つ"], "false": ["画面:入力内容を捨てる"]}, "e2e": ["ui.spec: 通信に失敗しても入力が消えない"]}
 {"table": "表示設定と共通の振る舞い", "col": 7, "conditions": {"true": ["色:利用者ごとの色を使う"]}, "actions": {"true": ["集計画面を開く"]}, "results": {"true": ["画面:背景との対比を保った文字色にする"]}, "unit": ["contrast: 背景に対して読める文字色を選ぶ"]}
+{"table": "表示設定と共通の振る舞い", "col": 8, "conditions": {"true": ["画面幅:狭い"]}, "actions": {"true": ["取引一覧を開く"]}, "results": {"true": ["画面:1取引を1枚のカードで縦に積む"], "false": ["画面:表の列が文字単位で折り返される"]}, "e2e": ["ui.spec: 狭い画面の取引一覧はカードで並ぶ"], "note": "8列の表は狭い画面に入りきらない（§6）"}

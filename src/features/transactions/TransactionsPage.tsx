@@ -6,6 +6,7 @@ import { Button, Card, ErrorText, ScopeTag, Tabs, TextInput } from '../../compon
 import { MonthNav } from '../app/Layout';
 import { currentMonthKey, formatDay } from '../../lib/date';
 import { formatAmount } from '../../lib/money';
+import { useNarrow } from '../../lib/useNarrow';
 import {
   deleteTransaction,
   loadMonthTransactions,
@@ -20,6 +21,7 @@ type ScopeFilterValue = 'all' | 'own' | string;
 
 export function TransactionsPage() {
   const workspace = useWorkspace();
+  const narrow = useNarrow();
   const { userId } = useAuth();
   const selfId = userId!;
   const [monthKey, setMonthKey] = useState(currentMonthKey());
@@ -46,6 +48,18 @@ export function TransactionsPage() {
     if (keyword !== '' && !`${category.name}${tx.memo}`.includes(keyword)) return false;
     return true;
   });
+
+  const categoryOf = (tx: Transaction) =>
+    workspace.categories.find((c) => c.id === tx.category_id)!;
+
+  function toggle(id: string, checked: boolean) {
+    setSelected(checked ? [...selected, id] : selected.filter((x) => x !== id));
+  }
+
+  async function remove(id: string) {
+    await deleteTransaction(id);
+    await reload();
+  }
 
   async function move() {
     setError('');
@@ -112,71 +126,115 @@ export function TransactionsPage() {
         />
       </div>
 
-      <Card className="overflow-x-auto p-0">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-[var(--c-subtle)] text-left text-xs text-[var(--c-ink-soft)]">
-              <th className="p-2"></th>
-              <th className="p-2">日付</th>
-              <th className="p-2">共有範囲</th>
-              <th className="p-2">カテゴリ</th>
-              <th className="p-2">支払者</th>
-              <th className="p-2 text-right">金額</th>
-              <th className="p-2">備考</th>
-              <th className="p-2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {visible.map((tx) => {
-              const category = workspace.categories.find((c) => c.id === tx.category_id)!;
-              return (
-                <tr key={tx.id} className="border-t border-[var(--c-line)]">
-                  <td className="p-2">
+      {/* 狭い画面では8列が横に入りきらないので、1取引=1枚のカードに積む（Layout と同じ境目）。 */}
+      {narrow ? (
+        <ul className="flex flex-col gap-2" data-testid="tx-cards">
+          {visible.map((tx) => {
+            const category = categoryOf(tx);
+            return (
+              <li key={tx.id}>
+                <Card className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-2">
                     <input
                       type="checkbox"
                       aria-label={`${category.name} を選ぶ`}
                       checked={selected.includes(tx.id)}
-                      onChange={(e) =>
-                        setSelected(
-                          e.target.checked
-                            ? [...selected, tx.id]
-                            : selected.filter((id) => id !== tx.id),
-                        )
-                      }
+                      onChange={(e) => toggle(tx.id, e.target.checked)}
                     />
-                  </td>
-                  <td className="p-2">{formatDay(tx.occurred_on)}</td>
-                  <td className="p-2">
+                    <span className="text-sm whitespace-nowrap">{formatDay(tx.occurred_on)}</span>
                     <ScopeTag
                       label={workspace.scopeLabel(category)}
                       kind={category.share_group_id === null ? 'own' : 'group'}
                     />
-                  </td>
-                  <td className="p-2">{category.name}</td>
-                  <td className="p-2">{workspace.displayName(tx.payer_id)}</td>
-                  <td className="p-2 text-right tabular-nums">{formatAmount(tx.amount)}</td>
-                  <td className="p-2">{tx.memo}</td>
-                  <td className="p-2 whitespace-nowrap">
+                    <span className="ml-auto text-base font-bold tabular-nums">
+                      {formatAmount(tx.amount)}
+                    </span>
+                  </div>
+                  <div className="text-sm">
+                    {category.name}
+                    <span className="text-[var(--c-ink-soft)]">
+                      {' / '}
+                      {workspace.displayName(tx.payer_id)}
+                    </span>
+                  </div>
+                  {tx.memo !== '' && (
+                    <p className="text-xs break-words text-[var(--c-muted)]">{tx.memo}</p>
+                  )}
+                  <div className="flex justify-end gap-3 text-sm">
                     <Link className="text-[var(--c-link)]" to={`/transactions/${tx.id}/edit`}>
                       編集
                     </Link>
                     <button
                       type="button"
-                      className="ml-2 text-[var(--c-warn)]"
-                      onClick={async () => {
-                        await deleteTransaction(tx.id);
-                        await reload();
-                      }}
+                      className="text-[var(--c-warn)]"
+                      onClick={() => void remove(tx.id)}
                     >
                       削除
                     </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </Card>
+                  </div>
+                </Card>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <Card className="overflow-x-auto p-0">
+          <table className="w-full text-sm" data-testid="tx-table">
+            <thead>
+              <tr className="bg-[var(--c-subtle)] text-left text-xs text-[var(--c-ink-soft)]">
+                <th className="p-2"></th>
+                <th className="p-2">日付</th>
+                <th className="p-2">共有範囲</th>
+                <th className="p-2">カテゴリ</th>
+                <th className="p-2">支払者</th>
+                <th className="p-2 text-right">金額</th>
+                <th className="p-2">備考</th>
+                <th className="p-2"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map((tx) => {
+                const category = categoryOf(tx);
+                return (
+                  <tr key={tx.id} className="border-t border-[var(--c-line)]">
+                    <td className="p-2">
+                      <input
+                        type="checkbox"
+                        aria-label={`${category.name} を選ぶ`}
+                        checked={selected.includes(tx.id)}
+                        onChange={(e) => toggle(tx.id, e.target.checked)}
+                      />
+                    </td>
+                    <td className="p-2 whitespace-nowrap">{formatDay(tx.occurred_on)}</td>
+                    <td className="p-2">
+                      <ScopeTag
+                        label={workspace.scopeLabel(category)}
+                        kind={category.share_group_id === null ? 'own' : 'group'}
+                      />
+                    </td>
+                    <td className="p-2">{category.name}</td>
+                    <td className="p-2">{workspace.displayName(tx.payer_id)}</td>
+                    <td className="p-2 text-right tabular-nums">{formatAmount(tx.amount)}</td>
+                    <td className="p-2">{tx.memo}</td>
+                    <td className="p-2 whitespace-nowrap">
+                      <Link className="text-[var(--c-link)]" to={`/transactions/${tx.id}/edit`}>
+                        編集
+                      </Link>
+                      <button
+                        type="button"
+                        className="ml-2 text-[var(--c-warn)]"
+                        onClick={() => void remove(tx.id)}
+                      >
+                        削除
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </Card>
+      )}
 
       {visible.length === 0 && <p className="text-xs text-[var(--c-muted)]">取引がありません</p>}
 

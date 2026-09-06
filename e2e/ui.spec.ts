@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures';
-import { adminClient, seedCategory } from './db';
+import { adminClient, seedCategory, seedTransaction } from './db';
 
 test.describe('表示設定と共通の振る舞い', () => {
   test('列1 ダークモードに切り替えると次に開いても続く', async ({ signedIn }) => {
@@ -72,5 +72,33 @@ test.describe('表示設定と共通の振る舞い', () => {
     await signedIn.unroute('**/rest/v1/rpc/upsert_transaction');
     await signedIn.getByRole('button', { name: '保存', exact: true }).click();
     await expect(signedIn.getByRole('heading', { name: '取引一覧' })).toBeVisible();
+  });
+
+  test('列8 狭い画面の取引一覧はカードで並ぶ', async ({ signedIn, users }) => {
+    const category = await seedCategory({ ownerId: users.taro, name: '食費' });
+    const occurredOn = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' });
+    await seedTransaction({
+      categoryId: category,
+      payerId: users.taro,
+      createdBy: users.taro,
+      occurredOn,
+      amount: 1280,
+      memo: '近所のスーパーでまとめ買い',
+      splits: [{ userId: users.taro, amount: 1280 }],
+    });
+
+    await signedIn.setViewportSize({ width: 375, height: 800 });
+    await signedIn.goto('/transactions');
+    await expect(signedIn.getByTestId('tx-cards')).toBeVisible();
+    await expect(signedIn.getByTestId('tx-table')).toHaveCount(0);
+
+    // 備考が1文字ずつ縦に折り返されないこと。折り返されると幅より高さが勝つ。
+    const memo = signedIn.getByText('近所のスーパーでまとめ買い');
+    const box = (await memo.boundingBox())!;
+    expect(box.width).toBeGreaterThan(box.height);
+
+    await signedIn.setViewportSize({ width: 1280, height: 900 });
+    await expect(signedIn.getByTestId('tx-table')).toBeVisible();
+    await expect(signedIn.getByTestId('tx-cards')).toHaveCount(0);
   });
 });
