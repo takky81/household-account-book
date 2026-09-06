@@ -8,7 +8,15 @@ import { formatAmount } from '../../lib/money';
 import { loadTransactions, type Transaction } from '../../lib/db';
 import { monthEnd, monthStart } from '../../lib/date';
 import { useAuth, useWorkspace } from '../app/context';
-import { SHARED_PAYER, aggregateMonth, monthDiff, type Basis, type ScopeFilter } from './aggregate';
+import {
+  SHARED_PAYER,
+  aggregateMonth,
+  categorySlices,
+  monthDiff,
+  type Basis,
+  type ScopeFilter,
+  type Slice,
+} from './aggregate';
 import { toAggregateTx } from '../app/model';
 
 const MONTHS_IN_CHART = 6;
@@ -48,6 +56,9 @@ export function AggregatePage() {
   const common = { transactions, scope, basis, selfId, members };
   const totals = aggregateMonth({ ...common, monthKey });
   const previous = aggregateMonth({ ...common, monthKey: addMonths(monthKey, -1) });
+
+  const slices = categorySlices(totals.byCategory);
+  const colorOf = new Map(slices.map((slice) => [slice.key, slice.colorIndex]));
 
   const history = Array.from({ length: MONTHS_IN_CHART }, (_, i) => {
     const key = addMonths(monthKey, -(MONTHS_IN_CHART - 1 - i));
@@ -105,34 +116,48 @@ export function AggregatePage() {
         {totals.byCategory.length === 0 && (
           <p className="text-xs text-[var(--c-muted)]">この月の取引はありません</p>
         )}
-        <ul className="flex flex-col gap-1">
-          {totals.byCategory.map((row) => (
-            <li key={row.categoryId} className="flex items-center justify-between text-sm">
-              <span className="flex items-center gap-1">
-                <ScopeTag
-                  label={
-                    row.shareGroupId === null ? '個人' : workspace.groupName(row.shareGroupId)
-                  }
-                  kind={row.shareGroupId === null ? 'own' : 'group'}
-                />
-                {row.name}
-              </span>
-              <span className="tabular-nums">{formatAmount(row.amount)}</span>
-            </li>
-          ))}
-        </ul>
+        <div className="flex flex-wrap items-center gap-4">
+          {slices.length > 1 && <CategoryPie slices={slices} />}
+          <ul className="flex min-w-[16rem] flex-1 flex-col gap-1">
+            {totals.byCategory.map((row) => {
+              const slice = colorOf.get(row.categoryId);
+              return (
+                <li key={row.categoryId} className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-1">
+                    <span
+                      aria-hidden
+                      className="size-2.5 shrink-0 rounded-full"
+                      style={{ background: `var(--c-cat-${slice ?? 7})` }}
+                    />
+                    <ScopeTag
+                      label={
+                        row.shareGroupId === null ? '個人' : workspace.groupName(row.shareGroupId)
+                      }
+                      kind={row.shareGroupId === null ? 'own' : 'group'}
+                    />
+                    {row.name}
+                  </span>
+                  <span className="tabular-nums">{formatAmount(row.amount)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       </Card>
 
       <Card>
         <h2 className="mb-2 text-sm font-bold">月次の推移</h2>
-        <div className="flex h-24 items-end gap-2">
+        <div className="flex h-24 gap-2">
           {history.map((month) => (
-            <div key={month.key} className="flex flex-1 flex-col items-center gap-1">
-              <div
-                className="w-full rounded-t bg-[var(--c-bar)]"
-                style={{ height: `${(month.total / peak) * 100}%` }}
-                title={`${month.key} ${formatAmount(month.total)}`}
-              />
+            <div key={month.key} className="flex h-full flex-1 flex-col items-center gap-1">
+              {/* 棒の高さは % で出すので、棒を入れる枠にも高さが要る */}
+              <div className="flex w-full flex-1 items-end">
+                <div
+                  className="w-full rounded-t bg-[var(--c-bar)]"
+                  style={{ height: `${(month.total / peak) * 100}%` }}
+                  title={`${month.key} ${formatAmount(month.total)}`}
+                />
+              </div>
               <span className="text-[10px] text-[var(--c-muted)]">{month.key.slice(5)}</span>
             </div>
           ))}
@@ -155,5 +180,41 @@ export function AggregatePage() {
         </Card>
       )}
     </main>
+  );
+}
+
+/** カテゴリ別の内訳の円グラフ。1件しかない月は輪が1周するだけなので、呼ぶ側で出さない。割合は隣の一覧の金額で裏取りできるので、図には数字を載せない。 */
+function CategoryPie({ slices }: { slices: Slice[] }) {
+  const radius = 38;
+  const circumference = 2 * Math.PI * radius;
+  const gap = 1.5; // 隣り合う扇のあいだに地の色を覗かせる
+  let offset = 0;
+
+  return (
+    <svg viewBox="0 0 100 100" role="img" aria-label="カテゴリ別の内訳" className="mx-auto size-32 shrink-0">
+      <circle cx="50" cy="50" r={radius} fill="none" stroke="var(--c-bar-track)" strokeWidth="12" />
+      {slices.map((slice) => {
+        const length = slice.ratio * circumference;
+        const dash = Math.max(length - gap, 0.5);
+        const start = offset;
+        offset += length;
+        return (
+          <circle
+            key={slice.key}
+            cx="50"
+            cy="50"
+            r={radius}
+            fill="none"
+            stroke={`var(--c-cat-${slice.colorIndex})`}
+            strokeWidth="12"
+            strokeDasharray={`${dash} ${circumference - dash}`}
+            strokeDashoffset={-start}
+            transform="rotate(-90 50 50)"
+          >
+            <title>{`${slice.name} ${Math.round(slice.ratio * 100)}%`}</title>
+          </circle>
+        );
+      })}
+    </svg>
   );
 }
