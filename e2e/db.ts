@@ -42,6 +42,17 @@ export async function ensureUser(user: { email: string; password: string }): Pro
   return created.data.user.id;
 }
 
+/** パスワードを差し替える。変更のテストが後続へ影響しないよう戻すのに使う。 */
+export async function setPassword(email: string, password: string): Promise<void> {
+  const db = adminClient();
+  const { data, error } = await db.auth.admin.listUsers();
+  if (error !== null) throw error;
+  const user = data.users.find((u) => u.email === email);
+  if (user === undefined) throw new Error(`利用者が見つかりません: ${email}`);
+  const updated = await db.auth.admin.updateUserById(user.id, { password });
+  if (updated.error !== null) throw updated.error;
+}
+
 export type TestUsers = { taro: string; hana: string; other: string };
 
 export async function ensureUsers(): Promise<TestUsers> {
