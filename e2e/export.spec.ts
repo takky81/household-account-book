@@ -32,9 +32,9 @@ test.describe('CSVエクスポート', () => {
 
     expect(text.startsWith('﻿')).toBe(true);
     expect(text).toContain('\r\n');
-    expect(text).toContain('日付,収支,共有範囲,カテゴリ,金額,支払者,負担,備考');
-    // 負担は表示名の順に並ぶ（読み込んだ順は決まらない）
-    expect(text).toContain('2026-09-01,支出,夫婦,家賃,1000,共用,hana:500;taro:500,九月分');
+    expect(text).toContain('日付,収支,共有範囲,カテゴリ,小分類,金額,支払者,負担,備考');
+    // 負担は表示名の順に並ぶ（読み込んだ順は決まらない）。小分類の無い取引は空欄
+    expect(text).toContain('2026-09-01,支出,夫婦,家賃,,1000,共用,hana:500;taro:500,九月分');
   });
 
   test('列9 カテゴリの書き出しでは期間を選べない', async ({ signedIn, users }) => {
@@ -53,7 +53,30 @@ test.describe('CSVエクスポート', () => {
     const text = await downloadCsv(signedIn);
 
     expect(text.replace('﻿', '').trim()).toBe(
-      '日付,収支,共有範囲,カテゴリ,金額,支払者,負担,備考',
+      '日付,収支,共有範囲,カテゴリ,小分類,金額,支払者,負担,備考',
     );
+  });
+  test('列11・列12 小分類の列が出る', async ({ signedIn, users }) => {
+    const parent = await seedCategory({ ownerId: users.taro, name: '食費' });
+    const child = await seedCategory({ ownerId: users.taro, name: '外食', parentId: parent });
+    await seedTransaction({
+      categoryId: child,
+      payerId: users.taro,
+      createdBy: users.taro,
+      occurredOn: '2026-09-01',
+      amount: 780,
+      memo: '昼食',
+      splits: [{ userId: users.taro, amount: 780 }],
+    });
+
+    await signedIn.goto('/export');
+    const transactions = await downloadCsv(signedIn);
+    expect(transactions).toContain('日付,収支,共有範囲,カテゴリ,小分類,金額,支払者,負担,備考');
+    expect(transactions).toContain('2026-09-01,支出,個人,食費,外食,780,taro,taro:780,昼食');
+
+    await signedIn.getByRole('button', { name: 'カテゴリ', exact: true }).click();
+    const categories = await downloadCsv(signedIn);
+    expect(categories).toContain('共有範囲,収支,カテゴリ,小分類,色,表示順,未分類,アーカイブ済み');
+    expect(categories).toContain('個人,支出,食費,外食,');
   });
 });

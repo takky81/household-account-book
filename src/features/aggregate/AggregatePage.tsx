@@ -28,6 +28,14 @@ export function AggregatePage() {
   const [monthKey, setMonthKey] = useState(currentMonthKey());
   const [scopeValue, setScopeValue] = useState<'all' | 'own' | string>('all');
   const [basis, setBasis] = useState<Basis>('burden');
+  /** 内訳を開いている大分類（§5.4） */
+  const [expanded, setExpanded] = useState<string[]>([]);
+  const toggleExpanded = (categoryId: string) =>
+    setExpanded((current) =>
+      current.includes(categoryId)
+        ? current.filter((id) => id !== categoryId)
+        : [...current, categoryId],
+    );
   const [rows, setRows] = useState<Transaction[]>([]);
 
   const first = addMonths(monthKey, -(MONTHS_IN_CHART - 1));
@@ -52,18 +60,28 @@ export function AggregatePage() {
         ? { kind: 'own' }
         : { kind: 'group', shareGroupId: scopeValue };
 
-  const transactions = toAggregateTx(rows, workspace.categories);
-  const common = { transactions, scope, basis, selfId, members };
-  const totals = aggregateMonth({ ...common, monthKey });
-  const previous = aggregateMonth({ ...common, monthKey: addMonths(monthKey, -1) });
+  // 内訳の開け閉てのたびに数え直さない（8か月ぶんの集計になる）
+  const { totals, previous, history } = useMemo(() => {
+    const common = {
+      transactions: toAggregateTx(rows, workspace.categories),
+      scope,
+      basis,
+      selfId,
+      members,
+    };
+    return {
+      totals: aggregateMonth({ ...common, monthKey }),
+      previous: aggregateMonth({ ...common, monthKey: addMonths(monthKey, -1) }),
+      history: Array.from({ length: MONTHS_IN_CHART }, (_, i) => {
+        const key = addMonths(monthKey, -(MONTHS_IN_CHART - 1 - i));
+        return { key, total: aggregateMonth({ ...common, monthKey: key }).expense };
+      }),
+    };
+    // scope は毎回作り直されるオブジェクトなので、中身で見る
+  }, [rows, workspace.categories, scopeValue, basis, selfId, members, monthKey]);
 
   const slices = categorySlices(totals.byCategory);
   const colorOf = new Map(slices.map((slice) => [slice.key, slice.colorIndex]));
-
-  const history = Array.from({ length: MONTHS_IN_CHART }, (_, i) => {
-    const key = addMonths(monthKey, -(MONTHS_IN_CHART - 1 - i));
-    return { key, total: aggregateMonth({ ...common, monthKey: key }).expense };
-  });
   const peak = Math.max(1, ...history.map((h) => h.total));
 
   return (
@@ -121,23 +139,51 @@ export function AggregatePage() {
           <ul className="flex min-w-[16rem] flex-1 flex-col gap-1">
             {totals.byCategory.map((row) => {
               const slice = colorOf.get(row.categoryId);
+              const open = expanded.includes(row.categoryId);
               return (
-                <li key={row.categoryId} className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-1">
-                    <span
-                      aria-hidden
-                      className="size-2.5 shrink-0 rounded-full"
-                      style={{ background: `var(--c-cat-${slice ?? 7})` }}
-                    />
-                    <ScopeTag
-                      label={
-                        row.shareGroupId === null ? '個人' : workspace.groupName(row.shareGroupId)
-                      }
-                      kind={row.shareGroupId === null ? 'own' : 'group'}
-                    />
-                    {row.name}
-                  </span>
-                  <span className="tabular-nums">{formatAmount(row.amount)}</span>
+                <li key={row.categoryId} className="flex flex-col text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1">
+                      <span
+                        aria-hidden
+                        className="size-2.5 shrink-0 rounded-full"
+                        style={{ background: `var(--c-cat-${slice ?? 7})` }}
+                      />
+                      <ScopeTag
+                        label={
+                          row.shareGroupId === null ? '個人' : workspace.groupName(row.shareGroupId)
+                        }
+                        kind={row.shareGroupId === null ? 'own' : 'group'}
+                      />
+                      {row.name}
+                      {/* 小分類の取引があるときだけ内訳を開ける（§5.4） */}
+                      {row.children.length > 0 && (
+                        <button
+                          type="button"
+                          aria-label={`${row.name}の内訳`}
+                          aria-expanded={open}
+                          className="text-xs text-[var(--c-muted)]"
+                          onClick={() => toggleExpanded(row.categoryId)}
+                        >
+                          {open ? '▲' : '▼'}
+                        </button>
+                      )}
+                    </span>
+                    <span className="tabular-nums">{formatAmount(row.amount)}</span>
+                  </div>
+                  {open && (
+                    <ul className="mt-1 flex flex-col gap-1 pl-6 text-xs text-[var(--c-ink-soft)]">
+                      {row.children.map((child) => (
+                        <li
+                          key={child.categoryId}
+                          className="flex items-center justify-between"
+                        >
+                          <span>{child.name}</span>
+                          <span className="tabular-nums">{formatAmount(child.amount)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </li>
               );
             })}

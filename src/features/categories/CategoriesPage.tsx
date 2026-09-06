@@ -9,14 +9,151 @@ import {
   moveCategoryScope,
   updateCategory,
   type Category,
+  type ShareGroup,
 } from '../../lib/db';
 import { useAuth, useWorkspace, groupByScope } from '../app/context';
 import { findNameConflict, normalizeCategoryName, validateCategoryName, type Kind } from './name';
 import { nextSortOrder, reorder } from './order';
+import { canBeParent, childrenOf, orderedTree, siblingsOf } from './tree';
 import { checkMove, manualCount } from '../scope/move';
-import { toCategoryLike, toMoveTx } from '../app/model';
+import { toMoveTx, toTreeCategory } from '../app/model';
 
 const OWN = '__own__';
+/** 親を選ばない（大分類として作る） */
+const ROOT = '';
+
+/** 名前が衝突したときの知らせ方。大分類と小分類で見る範囲が違う（§3.4） */
+function conflictMessage(parentId: string | null): string {
+  return parentId === null
+    ? '同じ共有範囲に同じ名前のカテゴリがあります'
+    : '同じ大分類に同じ名前の小分類があります';
+}
+
+type RowActions = {
+  rename: (categoryId: string, raw: string) => void;
+  move: (category: Category, direction: 'up' | 'down') => void;
+  remove: (categoryId: string) => void;
+  update: (categoryId: string, patch: { color?: string; is_archived?: boolean }) => void;
+  startMove: (categoryId: string, dest: string) => void;
+};
+
+/** 一覧の1行。小分類は親の下にぶら下げて見せる（§3.4.1） */
+function CategoryRow({
+  category,
+  siblings,
+  groups,
+  actions,
+}: {
+  category: Category;
+  siblings: Category[];
+  groups: ShareGroup[];
+  actions: RowActions;
+}) {
+  const index = siblings.findIndex((c) => c.id === category.id);
+  const isChild = category.parent_id !== null;
+  return (
+    <div className={`flex items-center justify-between gap-2 ${isChild ? 'pl-4' : ''}`}>
+      <span className="flex min-w-0 flex-1 items-center gap-1 text-sm">
+        {isChild && (
+          <span aria-hidden className="shrink-0 text-xs text-[var(--c-muted)]">
+            └
+          </span>
+        )}
+        {!category.is_system && (
+          <span className="flex flex-col leading-none">
+            <button
+              type="button"
+              aria-label={`${category.name}を上へ`}
+              className="text-xs disabled:opacity-30"
+              disabled={index <= 0}
+              onClick={() => actions.move(category, 'up')}
+            >
+              ▲
+            </button>
+            <button
+              type="button"
+              aria-label={`${category.name}を下へ`}
+              className="text-xs disabled:opacity-30"
+              disabled={index === siblings.length - 1}
+              onClick={() => actions.move(category, 'down')}
+            >
+              ▼
+            </button>
+          </span>
+        )}
+        {category.is_system ? (
+          category.name
+        ) : (
+          <TextInput
+            aria-label={`${category.name}の名前`}
+            className="w-full min-w-0"
+            defaultValue={category.name}
+            key={category.name}
+            onBlur={(e) => actions.rename(category.id, e.target.value)}
+          />
+        )}
+        {!category.is_system && (
+          <input
+            type="color"
+            aria-label={`${category.name}の色`}
+            className="h-6 w-8 shrink-0 rounded border border-[var(--c-edge)]"
+            defaultValue={category.color}
+            key={`${category.id}-color`}
+            onBlur={(e) => {
+              if (e.target.value !== category.color) {
+                actions.update(category.id, { color: e.target.value });
+              }
+            }}
+          />
+        )}
+        {category.is_archived && (
+          <span className="ml-1 text-xs text-[var(--c-muted)]">アーカイブ済み</span>
+        )}
+        {category.is_system && (
+          <span className="ml-1 text-xs text-[var(--c-muted)]">（消せない）</span>
+        )}
+      </span>
+      {!category.is_system && (
+        <span className="flex shrink-0 items-center gap-1 text-xs">
+          {/* 共有範囲の変更は大分類の単位。小分類には出さない（§5.2） */}
+          {!isChild && (
+            <select
+              aria-label={`${category.name}の移動先`}
+              className="rounded border border-[var(--c-edge)] bg-[var(--c-panel)] px-1 py-0.5"
+              defaultValue=""
+              onChange={(e) => {
+                if (e.target.value !== '') actions.startMove(category.id, e.target.value);
+              }}
+            >
+              <option value="">共有範囲を変える</option>
+              <option value={OWN}>個人へ</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}へ
+                </option>
+              ))}
+            </select>
+          )}
+          <button
+            type="button"
+            aria-label={`${category.name}を${category.is_archived ? '戻す' : 'アーカイブ'}`}
+            onClick={() => actions.update(category.id, { is_archived: !category.is_archived })}
+          >
+            {category.is_archived ? '戻す' : 'アーカイブ'}
+          </button>
+          <button
+            type="button"
+            aria-label={`${category.name}を削除`}
+            className="text-[var(--c-warn)]"
+            onClick={() => actions.remove(category.id)}
+          >
+            削除
+          </button>
+        </span>
+      )}
+    </div>
+  );
+}
 
 export function CategoriesPage() {
   const workspace = useWorkspace();
@@ -25,11 +162,24 @@ export function CategoriesPage() {
   const [kind, setKind] = useState<Kind>('expense');
   const [name, setName] = useState('');
   const [scope, setScope] = useState<string>(OWN);
+  const [parentId, setParentId] = useState<string>(ROOT);
   const [error, setError] = useState('');
   const [moveTarget, setMoveTarget] = useState<{ id: string; dest: string } | null>(null);
   const [confirm, setConfirm] = useState<{ message: string; merge: boolean } | null>(null);
 
-  /** 名前を変える。同じ共有範囲の同名は保存する前に弾く（列3） */
+  const shareGroupId = scope === OWN ? null : scope;
+  const ownerId = shareGroupId === null ? selfId : null;
+
+  /** 追加フォームで親に選べる大分類（未分類は親になれない。§3.4.1） */
+  const parentOptions = workspace.tree.filter(
+    (c) =>
+      canBeParent(c) &&
+      c.kind === kind &&
+      c.shareGroupId === shareGroupId &&
+      c.ownerId === ownerId,
+  );
+
+  /** 名前を変える。同じ共有範囲・同じ親の同名は保存する前に弾く（列3・列16） */
   async function rename(categoryId: string, raw: string) {
     setError('');
     const category = workspace.categories.find((c) => c.id === categoryId);
@@ -40,17 +190,18 @@ export function CategoriesPage() {
       return;
     }
     const conflict = findNameConflict(
-      workspace.categories.map(toCategoryLike),
+      workspace.tree,
       {
         shareGroupId: category.share_group_id,
         ownerId: category.owner_id,
         kind: category.kind,
         name: raw,
+        parentId: category.parent_id,
       },
       categoryId,
     );
     if (conflict !== null) {
-      setError('同じ共有範囲に同じ名前のカテゴリがあります');
+      setError(conflictMessage(category.parent_id));
       return;
     }
     try {
@@ -70,31 +221,22 @@ export function CategoriesPage() {
       setError(check.message);
       return;
     }
-    const shareGroupId = scope === OWN ? null : scope;
-    const conflict = findNameConflict(workspace.categories.map(toCategoryLike), {
-      shareGroupId,
-      ownerId: shareGroupId === null ? selfId : null,
-      kind,
-      name,
-    });
+    const parent = parentId === ROOT ? null : parentId;
+    const target = { parentId: parent, kind, shareGroupId, ownerId };
+    const conflict = findNameConflict(workspace.tree, { ...target, name });
     if (conflict !== null) {
-      setError('同じ共有範囲に同じ名前のカテゴリがあります');
+      setError(conflictMessage(parent));
       return;
     }
-    const siblings = workspace.categories.filter(
-      (c) =>
-        !c.is_system &&
-        c.kind === kind &&
-        c.share_group_id === shareGroupId &&
-        c.owner_id === (shareGroupId === null ? selfId : null),
-    );
     try {
       await createCategory({
         shareGroupId,
         kind,
         name: normalizeCategoryName(name),
         color: '#4a6fa5',
-        sortOrder: nextSortOrder(siblings.map((c) => ({ id: c.id, sortOrder: c.sort_order }))),
+        // 表示順は同じ親の中で決まる（§3.4）
+        sortOrder: nextSortOrder(siblingsOf(workspace.tree, target)),
+        parentId: parent,
       });
       setName('');
       await workspace.reload();
@@ -103,14 +245,16 @@ export function CategoriesPage() {
     }
   }
 
-  /** 同じ共有範囲の中で1つ上（下）へ動かす（列14） */
-  async function move(categoryId: string, siblings: Category[], direction: 'up' | 'down') {
+  /** 同じ親の中で1つ上（下）へ動かす（列14・列23） */
+  async function move(category: Category, direction: 'up' | 'down') {
     setError('');
-    const changed = reorder(
-      siblings.map((c) => ({ id: c.id, sortOrder: c.sort_order })),
-      categoryId,
-      direction,
-    );
+    const siblings = siblingsOf(workspace.tree, {
+      parentId: category.parent_id,
+      kind: category.kind,
+      shareGroupId: category.share_group_id,
+      ownerId: category.owner_id,
+    });
+    const changed = reorder(siblings, category.id, direction);
     if (changed.length === 0) return;
     try {
       for (const item of changed) {
@@ -130,13 +274,17 @@ export function CategoriesPage() {
     const destShareGroupId = dest === OWN ? null : dest;
     const destOwnerId = destShareGroupId === null ? selfId : null;
 
-    const transactions = (await loadTransactions({})).filter((tx) => tx.category_id === categoryId);
+    // 移動の単位は大分類。配下の小分類の取引も対象に含める（§5.2）
+    const childIds = childrenOf(workspace.tree, categoryId).map((c) => c.id);
+    const transactions = (await loadTransactions({})).filter(
+      (tx) => tx.category_id === categoryId || childIds.includes(tx.category_id),
+    );
     const check = checkMove({
       source: { shareGroupId: category.share_group_id, ownerId: category.owner_id },
       dest: { shareGroupId: destShareGroupId, ownerId: destOwnerId },
       kind: category.kind,
       name: category.name,
-      categories: workspace.categories.map(toCategoryLike),
+      categories: workspace.tree,
       transactions: toMoveTx(transactions),
       destMemberIds:
         destShareGroupId === null
@@ -182,6 +330,25 @@ export function CategoriesPage() {
     }
   }
 
+  async function apply(run: Promise<void>, failed: string) {
+    setError('');
+    try {
+      await run;
+      await workspace.reload();
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : failed);
+    }
+  }
+
+  const actions: RowActions = {
+    rename: (categoryId, raw) => void rename(categoryId, raw),
+    move: (category, direction) => void move(category, direction),
+    remove: (categoryId) => void apply(deleteCategory(categoryId), '消せませんでした'),
+    update: (categoryId, patch) =>
+      void apply(updateCategory(categoryId, patch), '変えられませんでした'),
+    startMove: (categoryId, dest) => void startMove(categoryId, dest, false),
+  };
+
   return (
     <main className="mx-auto flex max-w-md flex-col gap-3 p-3">
       <h1 className="text-lg font-bold">カテゴリ</h1>
@@ -199,11 +366,33 @@ export function CategoriesPage() {
       <Card className="flex flex-col gap-2">
         <h2 className="text-sm font-bold">カテゴリを追加</h2>
         <Field label="共有範囲">
-          <Select value={scope} onChange={(e) => setScope(e.target.value)} aria-label="共有範囲">
+          <Select
+            value={scope}
+            onChange={(e) => {
+              setScope(e.target.value);
+              // 共有範囲が変わると親の候補も変わる
+              setParentId(ROOT);
+            }}
+            aria-label="共有範囲"
+          >
             <option value={OWN}>個人</option>
             {workspace.groups.map((g) => (
               <option key={g.id} value={g.id}>
                 {g.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="親カテゴリ">
+          <Select
+            value={parentId}
+            onChange={(e) => setParentId(e.target.value)}
+            aria-label="親カテゴリ"
+          >
+            <option value={ROOT}>なし（大分類にする）</option>
+            {parentOptions.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
               </option>
             ))}
           </Select>
@@ -234,122 +423,34 @@ export function CategoriesPage() {
 
       {scoped.map((group) => {
         // 未分類は常に末尾（sort_order 9999）なので並べ替えの対象から外す
-        const movable = group.items.filter((c) => !c.is_system);
+        const movable = group.items.filter((c) => !c.is_system && c.parent_id === null);
+        // DB の行を持ったままツリーの順に並べる（並べ替えたあとで引き直さない）
+        const tree = orderedTree(group.items.map((c) => ({ ...toTreeCategory(c), row: c })));
         return (
           <Card key={group.key} className="flex flex-col gap-2">
             <ScopeTag
               label={workspace.scopeLabel({ share_group_id: group.shareGroupId })}
               kind={group.shareGroupId === null ? 'own' : 'group'}
             />
-            {group.items.map((category) => {
-              const index = movable.findIndex((c) => c.id === category.id);
+            {tree.map(({ root, children }) => {
+              const childRows = children.map((c) => c.row);
               return (
-                <div
-                  key={category.id}
-                  className="flex items-center justify-between gap-2"
-                >
-                  <span className="flex min-w-0 flex-1 items-center gap-1 text-sm">
-                    {!category.is_system && (
-                      <span className="flex flex-col leading-none">
-                        <button
-                          type="button"
-                          aria-label={`${category.name}を上へ`}
-                          className="text-xs disabled:opacity-30"
-                          disabled={index === 0}
-                          onClick={() => void move(category.id, movable, 'up')}
-                        >
-                          ▲
-                        </button>
-                        <button
-                          type="button"
-                          aria-label={`${category.name}を下へ`}
-                          className="text-xs disabled:opacity-30"
-                          disabled={index === movable.length - 1}
-                          onClick={() => void move(category.id, movable, 'down')}
-                        >
-                          ▼
-                        </button>
-                      </span>
-                    )}
-                    {category.is_system ? (
-                      category.name
-                    ) : (
-                      <TextInput
-                        aria-label={`${category.name}の名前`}
-                        className="w-full min-w-0"
-                        defaultValue={category.name}
-                        key={category.name}
-                        onBlur={(e) => void rename(category.id, e.target.value)}
-                      />
-                    )}
-                    {!category.is_system && (
-                      <input
-                        type="color"
-                        aria-label={`${category.name}の色`}
-                        className="h-6 w-8 shrink-0 rounded border border-[var(--c-edge)]"
-                        defaultValue={category.color}
-                        key={`${category.id}-color`}
-                        onBlur={async (e) => {
-                          if (e.target.value === category.color) return;
-                          await updateCategory(category.id, { color: e.target.value });
-                          await workspace.reload();
-                        }}
-                      />
-                    )}
-                    {category.is_archived && (
-                      <span className="ml-1 text-xs text-[var(--c-muted)]">アーカイブ済み</span>
-                    )}
-                    {category.is_system && (
-                      <span className="ml-1 text-xs text-[var(--c-muted)]">（消せない）</span>
-                    )}
-                  </span>
-                  {!category.is_system && (
-                    <span className="flex shrink-0 items-center gap-1 text-xs">
-                      <select
-                        aria-label={`${category.name}の移動先`}
-                        className="rounded border border-[var(--c-edge)] bg-[var(--c-panel)] px-1 py-0.5"
-                        defaultValue=""
-                        onChange={(e) => {
-                          if (e.target.value !== '')
-                            void startMove(category.id, e.target.value, false);
-                        }}
-                      >
-                        <option value="">共有範囲を変える</option>
-                        <option value={OWN}>個人へ</option>
-                        {workspace.groups.map((g) => (
-                          <option key={g.id} value={g.id}>
-                            {g.name}へ
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          await updateCategory(category.id, { is_archived: !category.is_archived });
-                          await workspace.reload();
-                        }}
-                      >
-                        {category.is_archived ? '戻す' : 'アーカイブ'}
-                      </button>
-                      <button
-                        type="button"
-                        className="text-[var(--c-warn)]"
-                        onClick={async () => {
-                          setError('');
-                          try {
-                            await deleteCategory(category.id);
-                            await workspace.reload();
-                          } catch (failure) {
-                            setError(
-                              failure instanceof Error ? failure.message : '消せませんでした',
-                            );
-                          }
-                        }}
-                      >
-                        削除
-                      </button>
-                    </span>
-                  )}
+                <div key={root.id} className="flex flex-col gap-2">
+                  <CategoryRow
+                    category={root.row}
+                    siblings={movable}
+                    groups={workspace.groups}
+                    actions={actions}
+                  />
+                  {childRows.map((child) => (
+                    <CategoryRow
+                      key={child.id}
+                      category={child}
+                      siblings={childRows}
+                      groups={workspace.groups}
+                      actions={actions}
+                    />
+                  ))}
                 </div>
               );
             })}
@@ -358,7 +459,8 @@ export function CategoriesPage() {
       })}
 
       <Note>
-        カテゴリを削除すると、その取引は同じ共有範囲・同じ収支区分の未分類へ移ります。未分類は削除できません
+        カテゴリは2段まで分けられます。小分類を削除するとその取引は親へ、大分類を削除すると同じ
+        共有範囲・同じ収支区分の未分類へ移ります。小分類が残っている大分類と未分類は削除できません
       </Note>
     </main>
   );

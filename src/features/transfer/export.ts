@@ -7,6 +7,7 @@
 import { toCsv } from '../../lib/csv';
 import { monthKeyOf } from '../../lib/date';
 import type { CategoryLike, Kind } from '../categories/name';
+import { orderedTree } from '../categories/tree';
 import type { MemberLike } from '../groups/members';
 
 /** 支払者なしを表す予約語。表示名には使えない（§4.2）。 */
@@ -21,6 +22,7 @@ export const TRANSACTION_HEADER = [
   '収支',
   '共有範囲',
   'カテゴリ',
+  '小分類',
   '金額',
   '支払者',
   '負担',
@@ -40,7 +42,10 @@ export type ExportTx = {
   kind: Kind;
   shareGroupId: string | null;
   ownerId: string | null;
+  /** 大分類の名前 */
   categoryName: string;
+  /** 小分類の名前。大分類そのものに付いた取引は null（§4.2） */
+  subcategoryName: string | null;
   amount: number;
   payerId: string | null;
   splits: { userId: string; amount: number }[];
@@ -73,6 +78,7 @@ export function transactionCsv(rows: ExportTx[], names: Names, groupNames: Names
       kindLabel(tx.kind),
       scopeLabel(tx.shareGroupId, groupNames),
       tx.categoryName,
+      tx.subcategoryName ?? '',
       String(tx.amount),
       tx.payerId === null ? SHARED_LABEL : (names[tx.payerId] ?? ''),
       splitsLabel(tx.splits, names),
@@ -90,16 +96,23 @@ export type ExportCategory = CategoryLike & {
 const yesNo = (value: boolean) => (value ? 'はい' : 'いいえ');
 
 export function categoryCsv(categories: ExportCategory[], groupNames: Names): string {
+  // 小分類の行は「カテゴリ」に親の名前を書く（§4.3）
+  const row = (category: ExportCategory, parentName: string | null) => [
+    scopeLabel(category.shareGroupId, groupNames),
+    kindLabel(category.kind),
+    parentName ?? category.name,
+    parentName === null ? '' : category.name,
+    category.color,
+    String(category.sortOrder),
+    yesNo(category.isSystem),
+    yesNo(category.isArchived),
+  ];
   return toCsv(
-    ['共有範囲', '収支', 'カテゴリ', '色', '表示順', '未分類', 'アーカイブ済み'],
-    categories.map((c) => [
-      scopeLabel(c.shareGroupId, groupNames),
-      kindLabel(c.kind),
-      c.name,
-      c.color,
-      String(c.sortOrder),
-      yesNo(c.isSystem),
-      yesNo(c.isArchived),
+    ['共有範囲', '収支', 'カテゴリ', '小分類', '色', '表示順', '未分類', 'アーカイブ済み'],
+    // 親の行を先に、続けてその小分類を並べる。並びは画面と同じ規則（§3.4）
+    orderedTree(categories).flatMap(({ root, children }) => [
+      row(root, null),
+      ...children.map((child) => row(child, root.name)),
     ]),
   );
 }

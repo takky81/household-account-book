@@ -29,6 +29,8 @@ export type GroupMember = {
 
 export type Category = {
   id: string;
+  /** 親カテゴリ。null なら大分類（§3.4.1） */
+  parent_id: string | null;
   share_group_id: string | null;
   owner_id: string | null;
   kind: Kind;
@@ -160,6 +162,8 @@ export async function createCategory(input: {
   name: string;
   color: string;
   sortOrder: number;
+  /** 小分類として作るときの親。共有範囲と収支区分は親からコピーされる（§3.4.1） */
+  parentId?: string | null;
 }): Promise<void> {
   // owner_id / created_by / is_system は既定値とトリガが入れる（列を grant していない）
   const { error } = await supabase.from('categories').insert({
@@ -168,6 +172,7 @@ export async function createCategory(input: {
     name: input.name,
     color: input.color,
     sort_order: input.sortOrder,
+    parent_id: input.parentId ?? null,
   });
   if (error !== null) throw new Error(error.message);
 }

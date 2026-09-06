@@ -64,4 +64,33 @@ test.describe('集計', () => {
     await expect(signedIn.getByText('この月の取引はありません')).toBeVisible();
     await expect(signedIn.getByTestId('expense')).toHaveText('0');
   });
+  test('列12・列13 内訳は大分類で集約し、展開すると小分類が出る', async ({ signedIn, users }) => {
+    const parent = await seedCategory({ ownerId: users.taro, name: '食費' });
+    const child = await seedCategory({ ownerId: users.taro, name: '外食', parentId: parent });
+    for (const [categoryId, amount] of [
+      [parent, 2000],
+      [child, 3000],
+    ] as const) {
+      await seedTransaction({
+        categoryId,
+        payerId: users.taro,
+        createdBy: users.taro,
+        occurredOn: today(),
+        amount,
+        splits: [{ userId: users.taro, amount }],
+      });
+    }
+
+    await signedIn.goto('/aggregate');
+
+    // 大分類の1行にまとまり、額は配下を含む
+    const row = signedIn.getByRole('listitem').filter({ hasText: '食費' });
+    await expect(row).toContainText('5,000');
+    await expect(signedIn.getByText('外食')).toHaveCount(0);
+
+    // 展開すると小分類と（小分類なし）の内訳が出る
+    await signedIn.getByRole('button', { name: '食費の内訳' }).click();
+    await expect(signedIn.getByText('外食')).toBeVisible();
+    await expect(signedIn.getByText('（小分類なし）')).toBeVisible();
+  });
 });

@@ -27,10 +27,10 @@ describe('budgetUsage', () => {
 });
 
 const categories = [
-  { id: 'c1', shareGroupId: 'g1', ownerId: null, kind: 'expense' as const, name: '家賃', isArchived: false },
-  { id: 'c2', shareGroupId: 'g1', ownerId: null, kind: 'expense' as const, name: '食費', isArchived: false },
-  { id: 'c3', shareGroupId: null, ownerId: 'u1', kind: 'expense' as const, name: '交際費', isArchived: false },
-  { id: 'c9', shareGroupId: 'g1', ownerId: null, kind: 'income' as const, name: '給与', isArchived: false },
+  { id: 'c1', parentId: null, shareGroupId: 'g1', ownerId: null, kind: 'expense' as const, name: '家賃', isArchived: false },
+  { id: 'c2', parentId: null, shareGroupId: 'g1', ownerId: null, kind: 'expense' as const, name: '食費', isArchived: false },
+  { id: 'c3', parentId: null, shareGroupId: null, ownerId: 'u1', kind: 'expense' as const, name: '交際費', isArchived: false },
+  { id: 'c9', parentId: null, shareGroupId: 'g1', ownerId: null, kind: 'income' as const, name: '給与', isArchived: false },
 ];
 
 const rows = () =>
@@ -68,6 +68,53 @@ describe('buildBudgetRows', () => {
     expect(家賃.budget).toBeNull();
     expect(家賃.rate).toBeNull();
     expect(家賃.actual).toBe(9400);
+  });
+});
+
+describe('buildBudgetRows（小分類）', () => {
+  const withChildren = [
+    ...categories,
+    { id: 'c2-eat', parentId: 'c2', shareGroupId: 'g1', ownerId: null, kind: 'expense' as const, name: '外食', isArchived: false },
+    { id: 'c2-cook', parentId: 'c2', shareGroupId: 'g1', ownerId: null, kind: 'expense' as const, name: '自炊', isArchived: false },
+  ];
+
+  const list = () =>
+    buildBudgetRows({
+      categories: withChildren,
+      budgets: [{ categoryId: 'c2', amount: 55000 }],
+      actuals: { c2: 20000, 'c2-eat': 30000, 'c2-cook': 12400 },
+      selfBurden: { c2: 10000, 'c2-eat': 15000, 'c2-cook': 6200 },
+    });
+
+  it('列12 小分類は予算の行に出さない', () => {
+    expect(list().some((r) => r.categoryId === 'c2-eat')).toBe(false);
+  });
+
+  it('列13 実績は配下の小分類を含む', () => {
+    const 食費 = list().find((r) => r.categoryId === 'c2')!;
+    expect(食費.actual).toBe(20000 + 30000 + 12400);
+    expect(食費.selfBurden).toBe(10000 + 15000 + 6200);
+    expect(食費.over).toBe(true);
+    expect(食費.remaining).toBe(55000 - 62400);
+  });
+
+  it('列13 小分類ごとの実績を内訳として持つ', () => {
+    const 食費 = list().find((r) => r.categoryId === 'c2')!;
+    expect(食費.children).toEqual([
+      { categoryId: 'c2-eat', name: '外食', actual: 30000 },
+      { categoryId: 'c2-cook', name: '自炊', actual: 12400 },
+    ]);
+  });
+
+  it('列13 小分類の無い大分類は内訳を持たない', () => {
+    const 家賃 = list().find((r) => r.categoryId === 'c1')!;
+    expect(家賃.children).toEqual([]);
+  });
+
+  it('列11 共有範囲の合計を小分類で二重に数えない', () => {
+    const group = scopeTotals(list()).find((t) => t.shareGroupId === 'g1')!;
+    expect(group.actual).toBe(62400);
+    expect(group.budget).toBe(55000);
   });
 });
 

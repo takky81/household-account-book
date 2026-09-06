@@ -8,3 +8,5 @@
 {"table": "CSVエクスポート", "col": 8, "conditions": {"true": ["対象:共有グループ"]}, "actions": {"true": ["書き出す"]}, "results": {"true": ["出力:メンバー1人を1行として出す", "出力:負担割合を出す"]}, "unit": ["toGroupCsv: メンバーごとに1行にする"]}
 {"table": "CSVエクスポート", "col": 9, "conditions": {"true": ["対象:カテゴリ", "期間:対象月を指定"]}, "actions": {"true": ["書き出す"]}, "results": {"false": ["画面:期間を選べる"]}, "e2e": ["export.spec: カテゴリとグループには期間を指定できない"], "note": "期間の概念がない対象に期間を出さない（§4.5）"}
 {"table": "CSVエクスポート", "col": 10, "conditions": {"true": ["対象:取引"], "false": ["取引:1件でもある"]}, "actions": {"true": ["書き出す"]}, "results": {"true": ["出力:ヘッダ行だけのファイルになる"], "false": ["結果:エラーになる"]}, "unit": ["toTransactionCsv: 0件でもヘッダを書く"]}
+{"table": "CSVエクスポート", "col": 11, "conditions": {"true": ["対象:取引", "データ:小分類の取引と大分類の取引がある"]}, "actions": {"true": ["書き出す"]}, "results": {"true": ["列:小分類の列が出る", "行:小分類の無い取引は空欄になる"]}, "unit": ["transactionCsv: 小分類の列を出す"], "e2e": ["export.spec: 小分類の列が出る"]}
+{"table": "CSVエクスポート", "col": 12, "conditions": {"true": ["対象:カテゴリ", "データ:小分類がある"]}, "actions": {"true": ["書き出す"]}, "results": {"true": ["行:小分類も1行として出る", "並び:親の行に続けて小分類が並ぶ"]}, "unit": ["categoryCsv: 小分類を親に続けて出す"], "e2e": ["export.spec: 小分類の列が出る"]}

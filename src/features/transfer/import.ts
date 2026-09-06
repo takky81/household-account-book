@@ -35,10 +35,19 @@ export type ImportContext = {
   duplicates: 'import' | 'skip';
 };
 
+export type NewCategory = {
+  shareGroupId: string | null;
+  ownerId: string | null;
+  kind: Kind;
+  name: string;
+  /** 小分類として作る場合の親。大分類ごと未知なら null（列19） */
+  parentId: string | null;
+};
+
 export type ImportPayload = {
   categoryId: string | null;
-  /** 未知のカテゴリを作る場合の中身（列8） */
-  newCategory: { shareGroupId: string | null; ownerId: string | null; kind: Kind; name: string } | null;
+  /** 未知のカテゴリを作る場合の中身（列8・列19）。作るのは一番深い1件だけ */
+  newCategory: NewCategory | null;
   occurredOn: string;
   amount: number;
   payerId: string | null;
@@ -148,17 +157,34 @@ export function analyzeImport(text: string, context: ImportContext): ImportResul
       return error('支払者がその共有範囲のメンバーではありません');
     }
 
-    // カテゴリ。共有範囲 + 収支 + 名前で引く
+    // カテゴリ。共有範囲 + 収支 + 名前で大分類を引き、小分類はその親の中で引く（§4.4）。
+    // 小分類の列は無くてもよい（下位分類を入れる前に書き出したファイルのため）
     const name = normalizeCategoryName(row['カテゴリ'] ?? '');
+    const subName = normalizeCategoryName(row['小分類'] ?? '');
     const inScope = context.categories.filter(
-      (c) => c.shareGroupId === shareGroupId && c.ownerId === ownerId && c.kind === kind,
+      (c) =>
+        (c.parentId ?? null) === null &&
+        c.shareGroupId === shareGroupId &&
+        c.ownerId === ownerId &&
+        c.kind === kind,
     );
-    let categoryId: string | null = inScope.find((c) => c.name === name)?.id ?? null;
-    let newCategory: ImportPayload['newCategory'] = null;
+    const root = inScope.find((c) => c.name === name) ?? null;
+    const child =
+      root === null || subName === ''
+        ? null
+        : (context.categories.find((c) => c.parentId === root.id && c.name === subName) ?? null);
+
+    let categoryId: string | null = subName === '' ? (root?.id ?? null) : (child?.id ?? null);
+    let newCategory: NewCategory | null = null;
     if (categoryId === null) {
       if (name !== '' && context.unknownCategory === 'create') {
-        newCategory = { shareGroupId, ownerId, kind, name };
+        // 一番深い未知の1件を作る。大分類ごと未知なら、まず大分類から
+        newCategory =
+          root === null
+            ? { shareGroupId, ownerId, kind, name, parentId: null }
+            : { shareGroupId, ownerId, kind, name: subName, parentId: root.id };
       } else {
+        // 未分類にするときは小分類を捨てて、その共有範囲の未分類（大分類）へ付ける
         const fallback = inScope.find((c) => c.isSystem === true);
         if (fallback === undefined) return error('その共有範囲の未分類カテゴリが見つかりません');
         categoryId = fallback.id;

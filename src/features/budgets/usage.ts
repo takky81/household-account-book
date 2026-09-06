@@ -15,14 +15,19 @@ export function budgetUsage(budget: number | null, actual: number): Usage {
   return { rate: actual / budget, remaining: budget - actual, over: actual > budget };
 }
 
+export type BudgetChild = { categoryId: string; name: string; actual: number };
+
 export type BudgetRow = {
   categoryId: string;
   name: string;
   shareGroupId: string | null;
   ownerId: string | null;
   budget: number | null;
+  /** 配下の小分類を含む実績（§5.6） */
   actual: number;
   selfBurden: number;
+  /** 小分類ごとの実績。実績のある小分類だけを多い順に並べる */
+  children: BudgetChild[];
 } & Usage;
 
 export function buildBudgetRows(input: {
@@ -32,12 +37,35 @@ export function buildBudgetRows(input: {
   selfBurden: Record<string, number>;
 }): BudgetRow[] {
   const amountOf = new Map(input.budgets.map((b) => [b.categoryId, b.amount]));
+  // 親ごとの小分類を1回の走査でまとめる（行ごとに絞り込むと件数の2乗になる）
+  const byParent = new Map<string, CategoryLike[]>();
+  for (const category of input.categories) {
+    if (category.parentId === null) continue;
+    const found = byParent.get(category.parentId);
+    if (found === undefined) byParent.set(category.parentId, [category]);
+    else found.push(category);
+  }
+
   return input.categories
-    // 予算は支出のみを対象とする。収入カテゴリには置けない
-    .filter((c) => c.kind === 'expense')
+    // 予算は支出の大分類にだけ置く。収入カテゴリと小分類は行に出さない（§3.7）
+    .filter((c) => c.kind === 'expense' && c.parentId === null)
     .map((c) => {
       const budget = amountOf.get(c.id) ?? null;
-      const actual = input.actuals[c.id] ?? 0;
+      const kids = byParent.get(c.id) ?? [];
+      const children = kids
+        .map((child) => ({
+          categoryId: child.id,
+          name: child.name,
+          actual: input.actuals[child.id] ?? 0,
+        }))
+        .filter((child) => child.actual > 0)
+        .sort((a, b) => b.actual - a.actual);
+      // 実績・自分の負担は、大分類そのものの分と配下の小分類の合計（§5.6）
+      const actual =
+        (input.actuals[c.id] ?? 0) + children.reduce((sum, child) => sum + child.actual, 0);
+      const selfBurden =
+        (input.selfBurden[c.id] ?? 0) +
+        kids.reduce((sum, child) => sum + (input.selfBurden[child.id] ?? 0), 0);
       return {
         categoryId: c.id,
         name: c.name,
@@ -45,7 +73,8 @@ export function buildBudgetRows(input: {
         ownerId: c.ownerId,
         budget,
         actual,
-        selfBurden: input.selfBurden[c.id] ?? 0,
+        selfBurden,
+        children,
         ...budgetUsage(budget, actual),
       };
     });

@@ -9,7 +9,7 @@ import { formatAmount, formatSigned } from '../../lib/money';
 import { loadBudgets, loadMonthTransactions, type Budget, type Transaction } from '../../lib/db';
 import { useAuth, useWorkspace } from '../app/context';
 import { aggregateMonth, monthDiff } from '../aggregate/aggregate';
-import { actualsByCategory, selfBurdenByCategory, toAggregateTx, toCategoryLike } from '../app/model';
+import { actualsByCategory, selfBurdenByCategory, toAggregateTx } from '../app/model';
 import { buildBudgetRows } from '../budgets/usage';
 
 export function HomePage() {
@@ -60,7 +60,7 @@ export function HomePage() {
   });
 
   const budgetRows = buildBudgetRows({
-    categories: workspace.categories.map(toCategoryLike),
+    categories: workspace.tree,
     budgets: budgets.map((b) => ({ categoryId: b.category_id, amount: b.amount })),
     actuals: actualsByCategory(current),
     selfBurden: selfBurdenByCategory(current, selfId),
@@ -128,7 +128,7 @@ export function HomePage() {
                     label={workspace.scopeLabel(category)}
                     kind={category.share_group_id === null ? 'own' : 'group'}
                   />
-                  {category.name}
+                  {workspace.categoryPath(category.id)}
                   <span className="text-xs text-[var(--c-muted)]">
                     {workspace.displayName(tx.payer_id)}
                   </span>

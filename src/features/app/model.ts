@@ -2,19 +2,26 @@
 
 import type { Category, Transaction } from '../../lib/db';
 import type { AggregateTx } from '../aggregate/aggregate';
-import type { CategoryLike } from '../categories/name';
+import type { TreeCategory } from '../categories/tree';
 import type { MoveTx } from '../scope/move';
 import type { ExportTx } from '../transfer/export';
 
-export function toCategoryLike(category: Category): CategoryLike & { isSystem: boolean } {
+/**
+ * DB の行を、カテゴリを扱う共通の形（tree.ts）へ。
+ * CategoryLike（name.ts / move.ts / usage.ts が使う）はこの形の部分集合なので、
+ * 変換はこれ1つでよい。
+ */
+export function toTreeCategory(category: Category): TreeCategory {
   return {
     id: category.id,
+    parentId: category.parent_id,
+    name: category.name,
+    kind: category.kind,
     shareGroupId: category.share_group_id,
     ownerId: category.owner_id,
-    kind: category.kind,
-    name: category.name,
-    isArchived: category.is_archived,
+    sortOrder: category.sort_order,
     isSystem: category.is_system,
+    isArchived: category.is_archived,
   };
 }
 
@@ -29,6 +36,9 @@ export function toAggregateTx(transactions: Transaction[], categories: Category[
         occurredOn: tx.occurred_on,
         categoryId: tx.category_id,
         categoryName: category.name,
+        parentId: category.parent_id,
+        parentName:
+          category.parent_id === null ? null : (byId.get(category.parent_id)?.name ?? null),
         kind: category.kind,
         shareGroupId: category.share_group_id,
         ownerId: category.owner_id,
@@ -51,7 +61,12 @@ export function toExportTx(transactions: Transaction[], categories: Category[]):
         kind: category.kind,
         shareGroupId: category.share_group_id,
         ownerId: category.owner_id,
-        categoryName: category.name,
+        // CSV は「カテゴリ」に大分類、「小分類」にその名前を書く（§4.2）
+        categoryName:
+          category.parent_id === null
+            ? category.name
+            : (byId.get(category.parent_id)?.name ?? category.name),
+        subcategoryName: category.parent_id === null ? null : category.name,
         amount: tx.amount,
         payerId: tx.payer_id,
         splits: tx.transaction_splits.map((s) => ({ userId: s.user_id, amount: s.amount })),

@@ -11,6 +11,8 @@ export type Kind = 'income' | 'expense';
 
 export type CategoryLike = {
   id: string;
+  /** 親カテゴリ。null なら大分類（§3.4.1） */
+  parentId: string | null;
   shareGroupId: string | null;
   ownerId: string | null;
   kind: Kind;
@@ -38,23 +40,29 @@ export function validateCategoryName(raw: string): Validation {
 }
 
 /**
- * 同じ共有範囲・同じ収支区分に同じ名前があるか（列3・列4・列5）。
+ * 同じ名前が既にあるか（列3・列4・列5・列16・列17）。
+ *
+ * 大分類は同じ共有範囲・同じ収支区分の大分類どうしで、小分類は同じ親の中だけで見る
+ * （小分類の共有範囲と収支区分は親と一致するため、親だけで決まる。§3.4）。
  * アーカイブ済みも一意性の判定に含める。画面に出ていないカテゴリと衝突しうる。
  */
 export function findNameConflict(
   categories: CategoryLike[],
-  target: Scope & { kind: Kind; name: string },
+  target: Scope & { kind: Kind; name: string; parentId?: string | null },
   exceptId?: string,
 ): CategoryLike | null {
   const key = scopeKey(target.shareGroupId, target.ownerId);
   const name = normalizeCategoryName(target.name);
+  const parentId = target.parentId ?? null;
   return (
-    categories.find(
-      (c) =>
-        c.id !== exceptId &&
+    categories.find((c) => {
+      if (c.id === exceptId || c.name !== name) return false;
+      if (parentId !== null) return c.parentId === parentId;
+      return (
+        c.parentId === null &&
         scopeKey(c.shareGroupId, c.ownerId) === key &&
-        c.kind === target.kind &&
-        c.name === name,
-    ) ?? null
+        c.kind === target.kind
+      );
+    }) ?? null
   );
 }

@@ -25,8 +25,11 @@ const SOURCES: Record<string, string[]> = {
   ],
   カテゴリの管理: [
     'e2e/category.spec.ts',
+    'e2e/scope.spec.ts',
     'src/features/categories/name.test.ts',
     'src/features/categories/order.test.ts',
+    'src/features/categories/tree.test.ts',
+    'supabase/tests/06-subcategory.test.sql',
   ],
   取引の入力と編集: [
     'e2e/transaction.spec.ts',
@@ -39,11 +42,17 @@ const SOURCES: Record<string, string[]> = {
     'e2e/scope.spec.ts',
     'src/features/scope/move.test.ts',
     'supabase/tests/03-scope-move.test.sql',
+    'supabase/tests/06-subcategory.test.sql',
   ],
   CSVインポート: ['e2e/import.spec.ts', 'src/lib/csv.test.ts', 'src/features/transfer/import.test.ts'],
   CSVエクスポート: ['e2e/export.spec.ts', 'src/lib/csv.test.ts', 'src/features/transfer/export.test.ts'],
   集計: ['src/features/aggregate/aggregate.test.ts', 'e2e/aggregate.spec.ts', 'src/lib/paged.test.ts'],
-  予算: ['src/features/budgets/usage.test.ts', 'e2e/budget.spec.ts', 'supabase/tests/02-access.test.sql'],
+  予算: [
+    'src/features/budgets/usage.test.ts',
+    'e2e/budget.spec.ts',
+    'supabase/tests/02-access.test.sql',
+    'supabase/tests/06-subcategory.test.sql',
+  ],
   アクセス制御: [
     'e2e/access.spec.ts',
     'supabase/tests/01-basics.test.sql',

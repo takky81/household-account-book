@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  NO_SUBCATEGORY,
   PIE_COLORS,
   SHARED_PAYER,
   aggregateMonth,
@@ -241,6 +242,7 @@ describe('categorySlices', () => {
     name: id,
     scopeLabel: 'individual',
     shareGroupId: null,
+    children: [],
     amount,
   });
 
@@ -261,5 +263,64 @@ describe('categorySlices', () => {
 
   it('取引が無い月は空で返す', () => {
     expect(categorySlices([])).toEqual([]);
+  });
+});
+
+describe('aggregateMonth（小分類）', () => {
+  /** 夫婦の食費 / 外食 3,000。親は c-food-shared */
+  const 外食: AggregateTx = {
+    id: 't4',
+    occurredOn: '2026-08-31',
+    categoryId: 'c-eat',
+    categoryName: '外食',
+    parentId: 'c-food-shared',
+    parentName: '食費',
+    kind: 'expense',
+    shareGroupId: 夫婦,
+    ownerId: null,
+    amount: 3000,
+    payerId: hana,
+    splits: [
+      { userId: taro, amount: 1500 },
+      { userId: hana, amount: 1500 },
+    ],
+  };
+
+  const run = () =>
+    aggregateMonth({
+      transactions: [rent, food, 外食],
+      monthKey: '2026-08',
+      scope: { kind: 'group', shareGroupId: 夫婦 },
+      basis: 'burden',
+      selfId: taro,
+      members,
+    });
+
+  it('列12 カテゴリ別の内訳は大分類で集約し、配下の小分類を含む', () => {
+    const rows = run().byCategory;
+    expect(rows.map((r) => r.name)).toEqual(['家賃', '食費']);
+    const 食費 = rows.find((r) => r.name === '食費')!;
+    expect(食費.categoryId).toBe('c-food-shared');
+    expect(食費.amount).toBe(4200 + 3000);
+  });
+
+  it('列13 展開すると小分類の内訳が出る。大分類に直接付いた分は（小分類なし）', () => {
+    const 食費 = run().byCategory.find((r) => r.name === '食費')!;
+    expect(食費.children).toEqual([
+      { categoryId: 'c-food-shared', name: NO_SUBCATEGORY, amount: 4200 },
+      { categoryId: 'c-eat', name: '外食', amount: 3000 },
+    ]);
+    expect(食費.children.reduce((sum, c) => sum + c.amount, 0)).toBe(食費.amount);
+  });
+
+  it('列13 小分類の取引が無い大分類は内訳を持たない', () => {
+    const 家賃 = run().byCategory.find((r) => r.name === '家賃')!;
+    expect(家賃.children).toEqual([]);
+  });
+
+  it('列12 円グラフは大分類の単位で描く', () => {
+    const slices = categorySlices(run().byCategory);
+    expect(slices.map((s) => s.name)).toEqual(['家賃', '食費']);
+    expect(slices.find((s) => s.name === '食費')!.amount).toBe(7200);
   });
 });

@@ -93,4 +93,99 @@ test.describe('共有範囲の変更', () => {
     const splits = await splitsOf(id);
     expect(splits.map((s) => s.amount).sort()).toEqual([500, 500]);
   });
+  test('列13 小分類だけでは共有範囲を変えられない', async ({ signedIn, users }) => {
+    await seedGroup(users);
+    const parent = await seedCategory({ ownerId: users.taro, name: '食費' });
+    await seedCategory({ ownerId: users.taro, name: '外食', parentId: parent });
+
+    await signedIn.goto('/categories');
+    await expect(signedIn.getByLabel('外食の名前')).toBeVisible();
+    // 小分類には移動先を選ぶ手立てがない（大分類ごと移す）
+    await expect(signedIn.getByLabel('外食の移動先')).toHaveCount(0);
+    await expect(signedIn.getByLabel('食費の移動先')).toHaveCount(1);
+  });
+
+  test('列14 大分類を移すと小分類とその取引も移る', async ({ signedIn, users }) => {
+    const group = await seedGroup(users);
+    const parent = await seedCategory({ ownerId: users.taro, name: '食費' });
+    const child = await seedCategory({ ownerId: users.taro, name: '外食', parentId: parent });
+    const tx = await seedTransaction({
+      categoryId: child,
+      payerId: users.taro,
+      createdBy: users.taro,
+      occurredOn: '2026-09-01',
+      amount: 1000,
+      splits: [{ userId: users.taro, amount: 1000 }],
+    });
+
+    await signedIn.goto('/categories');
+    await signedIn.getByLabel('食費の移動先').selectOption({ label: '夫婦へ' });
+
+    await expect
+      .poll(async () => {
+        const { data } = await adminClient()
+          .from('categories')
+          .select('share_group_id')
+          .eq('id', child)
+          .single();
+        return (data as { share_group_id: string | null }).share_group_id;
+      })
+      .toBe(group);
+
+    // 配下の取引は小分類に付いたまま、負担だけ移動先の既定割合で作り直される
+    const { data } = await adminClient()
+      .from('transactions')
+      .select('category_id')
+      .eq('id', tx)
+      .single();
+    expect((data as { category_id: string }).category_id).toBe(child);
+    const splits = await splitsOf(tx);
+    expect(splits.map((s) => s.amount).sort()).toEqual([500, 500]);
+  });
+
+  test('列15 統合すると移動元の小分類の取引が移動先の同名小分類へ移る', async ({
+    signedIn,
+    users,
+  }) => {
+    const group = await seedGroup(users);
+    const own = await seedCategory({ ownerId: users.taro, name: '食費' });
+    const ownChild = await seedCategory({ ownerId: users.taro, name: '外食', parentId: own });
+    const groupParent = await seedCategory({ shareGroupId: group, name: '食費' });
+    const groupChild = await seedCategory({
+      shareGroupId: group,
+      name: '外食',
+      parentId: groupParent,
+    });
+    const tx = await seedTransaction({
+      categoryId: ownChild,
+      payerId: users.taro,
+      createdBy: users.taro,
+      occurredOn: '2026-09-01',
+      amount: 1000,
+      splits: [{ userId: users.taro, amount: 1000 }],
+    });
+
+    await signedIn.goto('/categories');
+    await signedIn.getByLabel('食費の移動先').first().selectOption({ label: '夫婦へ' });
+    await expect(signedIn.getByRole('alert')).toContainText('統合しますか');
+    await signedIn.getByRole('button', { name: '統合して移す' }).click();
+
+    await expect
+      .poll(async () => {
+        const { data } = await adminClient()
+          .from('transactions')
+          .select('category_id')
+          .eq('id', tx)
+          .single();
+        return (data as { category_id: string }).category_id;
+      })
+      .toBe(groupChild);
+
+    // 移動元のカテゴリは親子とも消える
+    const { count } = await adminClient()
+      .from('categories')
+      .select('id', { count: 'exact', head: true })
+      .in('id', [own, ownChild]);
+    expect(count).toBe(0);
+  });
 });

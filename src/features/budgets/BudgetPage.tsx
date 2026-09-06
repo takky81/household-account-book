@@ -14,7 +14,7 @@ import {
   type Transaction,
 } from '../../lib/db';
 import { useAuth, useWorkspace } from '../app/context';
-import { actualsByCategory, selfBurdenByCategory, toCategoryLike } from '../app/model';
+import { actualsByCategory, selfBurdenByCategory } from '../app/model';
 import { buildBudgetRows, copyBudgets, scopeTotals, validateBudgetAmount } from './usage';
 
 export function BudgetPage() {
@@ -51,7 +51,7 @@ export function BudgetPage() {
   }, [reload]);
 
   const budgetRows = buildBudgetRows({
-    categories: workspace.categories.map(toCategoryLike),
+    categories: workspace.tree,
     budgets: budgets.map((b) => ({ categoryId: b.category_id, amount: b.amount })),
     actuals: actualsByCategory(rows),
     selfBurden: selfBurdenByCategory(rows, selfId),
@@ -129,7 +129,19 @@ export function BudgetPage() {
                     kind={row.shareGroupId === null ? 'own' : 'group'}
                   />
                 </td>
-                <td className="p-2">{row.name}</td>
+                <td className="p-2">
+                  {row.name}
+                  {/* 小分類ごとの実績を内訳として出す（§5.6） */}
+                  {row.children.length > 0 && (
+                    <ul className="mt-0.5 flex flex-col gap-0.5 text-xs text-[var(--c-muted)]">
+                      {row.children.map((child) => (
+                        <li key={child.categoryId}>
+                          └ {child.name} {formatAmount(child.actual)}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </td>
                 <td className="p-2 text-right">
                   <input
                     aria-label={`${row.name}の予算`}

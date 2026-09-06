@@ -136,4 +136,39 @@ test.describe('予算', () => {
       .select('id', { count: 'exact', head: true });
     expect(count).toBe(0);
   });
+  test('列12・列13 予算は大分類に置き、実績は小分類を含む', async ({ signedIn, users }) => {
+    const parent = await seedCategory({ ownerId: users.taro, name: '食費' });
+    const child = await seedCategory({ ownerId: users.taro, name: '外食', parentId: parent });
+    await seedBudget(parent, thisMonth(), 10000);
+    for (const [categoryId, amount] of [
+      [parent, 2000],
+      [child, 3000],
+    ] as const) {
+      await seedTransaction({
+        categoryId,
+        payerId: users.taro,
+        createdBy: users.taro,
+        occurredOn: today(),
+        amount,
+        splits: [{ userId: users.taro, amount }],
+      });
+    }
+
+    await signedIn.goto('/budget');
+
+    // 小分類は予算の行として出ない
+    await expect(signedIn.getByLabel('外食の予算')).toHaveCount(0);
+    const row = signedIn.getByRole('row').filter({ hasText: '食費' });
+    // 実績は 2,000 + 3,000、残額は 5,000
+    await expect(row).toContainText('5,000');
+    // 小分類ごとの実績を内訳として出す
+    await expect(row).toContainText('外食');
+    await expect(row).toContainText('3,000');
+
+    // DB も小分類への予算を拒む
+    const { error } = await adminClient()
+      .from('budgets')
+      .insert({ category_id: child, month: thisMonth(), amount: 1000 });
+    expect(error).not.toBeNull();
+  });
 });

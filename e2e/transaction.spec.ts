@@ -247,4 +247,48 @@ test.describe('取引の入力と編集', () => {
     await expect(signedIn.getByRole('alert')).toBeVisible();
     await expect(signedIn.getByRole('heading', { name: '取引を入力' })).toBeVisible();
   });
+  test('列18 小分類を持つ大分類はそのまま選んで保存できる', async ({ signedIn, users }) => {
+    const parent = await seedCategory({ ownerId: users.taro, name: '食費' });
+    await seedCategory({ ownerId: users.taro, name: '外食', parentId: parent });
+
+    await signedIn.goto('/new');
+    await signedIn.getByLabel('カテゴリ').selectOption({ label: '個人 / 食費' });
+    await signedIn.getByLabel('金額').fill('500');
+    await signedIn.getByRole('button', { name: '保存', exact: true }).click();
+
+    await expect(signedIn.getByRole('heading', { name: '取引一覧' })).toBeVisible();
+    const { data } = await adminClient()
+      .from('transactions')
+      .select('category_id')
+      .eq('amount', 500)
+      .single();
+    expect((data as { category_id: string }).category_id).toBe(parent);
+  });
+
+  test('列19 小分類を選ぶと共有範囲と負担は親と同じになる', async ({ signedIn, users }) => {
+    const group = await seedGroup(users);
+    const parent = await seedCategory({ shareGroupId: group, name: '食費' });
+    const child = await seedCategory({ shareGroupId: group, name: '外食', parentId: parent });
+
+    await signedIn.goto('/new');
+    await signedIn.getByLabel('カテゴリ').selectOption({ label: '夫婦 / 食費 / 外食' });
+    await signedIn.getByLabel('金額').fill('1000');
+    // 親と同じ共有範囲なので、夫婦の既定割合で按分される
+    await expect(signedIn.getByLabel('taroの負担')).toHaveValue('500');
+    await expect(signedIn.getByLabel('hanaの負担')).toHaveValue('500');
+    await signedIn.getByRole('button', { name: '保存', exact: true }).click();
+
+    await expect(signedIn.getByRole('heading', { name: '取引一覧' })).toBeVisible();
+    const { data } = await adminClient()
+      .from('transactions')
+      .select('category_id, transaction_splits(amount)')
+      .eq('amount', 1000)
+      .single();
+    const saved = data as unknown as {
+      category_id: string;
+      transaction_splits: { amount: number }[];
+    };
+    expect(saved.category_id).toBe(child);
+    expect(saved.transaction_splits.map((s) => s.amount).sort()).toEqual([500, 500]);
+  });
 });

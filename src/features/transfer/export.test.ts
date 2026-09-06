@@ -18,6 +18,7 @@ const tx = {
   shareGroupId: 'g1' as string | null,
   ownerId: null as string | null,
   categoryName: '家賃',
+  subcategoryName: null as string | null,
   amount: 120000,
   payerId: null as string | null,
   splits: [
@@ -85,6 +86,7 @@ describe('categoryCsv', () => {
         [
           {
             id: 'c1',
+            parentId: null,
             shareGroupId: 'g1',
             ownerId: null,
             kind: 'expense',
@@ -96,6 +98,7 @@ describe('categoryCsv', () => {
           },
           {
             id: 'c2',
+            parentId: null,
             shareGroupId: null,
             ownerId: 'u1',
             kind: 'income',
@@ -122,6 +125,7 @@ describe('budgetCsv', () => {
         [
           {
             id: 'c1',
+            parentId: null,
             shareGroupId: 'g1',
             ownerId: null,
             kind: 'expense',
@@ -168,5 +172,38 @@ describe('期間の指定', () => {
     expect(canSpecifyPeriod('budgets')).toBe(true);
     expect(canSpecifyPeriod('categories')).toBe(false);
     expect(canSpecifyPeriod('groups')).toBe(false);
+  });
+});
+
+describe('小分類の書き出し', () => {
+  it('列11 取引CSVに小分類の列が出る', () => {
+    const 外食 = { ...tx, categoryName: '食費', subcategoryName: '外食', memo: '昼食' };
+    const { header, rows } = parseCsvRows(transactionCsv([外食, tx], names, groups));
+    expect(header).toContain('小分類');
+    expect(rows[0]).toMatchObject({ カテゴリ: '食費', 小分類: '外食' });
+    // 小分類の無い取引は空欄
+    expect(rows[1]).toMatchObject({ カテゴリ: '家賃', 小分類: '' });
+  });
+
+  it('列12 カテゴリCSVは小分類も1行として、親に続けて出す', () => {
+    const base = { color: '#e11d48', sortOrder: 10, isSystem: false, isArchived: false, kind: 'expense' as const };
+    const { rows } = parseCsvRows(
+      categoryCsv(
+        [
+          { id: 'c-daily', parentId: null, shareGroupId: 'g1', ownerId: null, name: '日用品', ...base, sortOrder: 20 },
+          { id: 'c-eat', parentId: 'c-food', shareGroupId: 'g1', ownerId: null, name: '外食', ...base, sortOrder: 20 },
+          { id: 'c-food', parentId: null, shareGroupId: 'g1', ownerId: null, name: '食費', ...base },
+          { id: 'c-cook', parentId: 'c-food', shareGroupId: 'g1', ownerId: null, name: '自炊', ...base },
+        ],
+        groups,
+      ),
+    );
+    expect(rows.map((r) => [r.カテゴリ, r.小分類])).toEqual([
+      ['食費', ''],
+      ['食費', '自炊'],
+      ['食費', '外食'],
+      ['日用品', ''],
+    ]);
+    expect(rows[1]).toMatchObject({ 共有範囲: '夫婦', 収支: '支出', 表示順: '10' });
   });
 });

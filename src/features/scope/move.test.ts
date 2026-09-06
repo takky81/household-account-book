@@ -15,8 +15,8 @@ const tx = (over: Partial<MoveTx> = {}): MoveTx => ({
 });
 
 const categories = [
-  { id: 'c1', shareGroupId: null, ownerId: taro, kind: 'expense' as const, name: '食費', isArchived: false },
-  { id: 'c2', shareGroupId: 夫婦, ownerId: null, kind: 'expense' as const, name: '食費', isArchived: false },
+  { id: 'c1', parentId: null, shareGroupId: null, ownerId: taro, kind: 'expense' as const, name: '食費', isArchived: false },
+  { id: 'c2', parentId: null, shareGroupId: 夫婦, ownerId: null, kind: 'expense' as const, name: '食費', isArchived: false },
 ];
 
 describe('scopeChanged', () => {

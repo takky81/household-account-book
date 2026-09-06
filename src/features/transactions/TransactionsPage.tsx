@@ -14,8 +14,9 @@ import {
   type Transaction,
 } from '../../lib/db';
 import { useAuth, useWorkspace } from '../app/context';
+import { selectableCategories } from '../categories/tree';
 import { checkMove } from '../scope/move';
-import { toCategoryLike, toMoveTx } from '../app/model';
+import { toMoveTx } from '../app/model';
 
 type ScopeFilterValue = 'all' | 'own' | string;
 
@@ -52,6 +53,7 @@ export function TransactionsPage() {
   const categoryOf = (tx: Transaction) =>
     workspace.categories.find((c) => c.id === tx.category_id)!;
 
+
   function toggle(id: string, checked: boolean) {
     setSelected(checked ? [...selected, id] : selected.filter((x) => x !== id));
   }
@@ -77,7 +79,7 @@ export function TransactionsPage() {
       dest: { shareGroupId: dest.share_group_id, ownerId: dest.owner_id },
       kind: dest.kind,
       name: dest.name,
-      categories: workspace.categories.map(toCategoryLike),
+      categories: workspace.tree,
       transactions: toMoveTx(picked),
       destMemberIds:
         dest.share_group_id === null
@@ -151,7 +153,7 @@ export function TransactionsPage() {
                     </span>
                   </div>
                   <div className="text-sm">
-                    {category.name}
+                    {workspace.categoryPath(category.id)}
                     <span className="text-[var(--c-ink-soft)]">
                       {' / '}
                       {workspace.displayName(tx.payer_id)}
@@ -212,7 +214,7 @@ export function TransactionsPage() {
                         kind={category.share_group_id === null ? 'own' : 'group'}
                       />
                     </td>
-                    <td className="p-2">{category.name}</td>
+                    <td className="p-2">{workspace.categoryPath(category.id)}</td>
                     <td className="p-2">{workspace.displayName(tx.payer_id)}</td>
                     <td className="p-2 text-right tabular-nums">{formatAmount(tx.amount)}</td>
                     <td className="p-2">{tx.memo}</td>
@@ -248,13 +250,12 @@ export function TransactionsPage() {
             onChange={(e) => setDestCategoryId(e.target.value)}
           >
             <option value="">選んでください</option>
-            {workspace.categories
-              .filter((c) => !c.is_archived)
-              .map((c) => (
-                <option key={c.id} value={c.id}>
-                  {workspace.scopeLabel(c)} / {c.name}
-                </option>
-              ))}
+            {selectableCategories(workspace.tree).map((c) => (
+              <option key={c.id} value={c.id}>
+                {workspace.scopeLabel({ share_group_id: c.shareGroupId })} /{' '}
+                {workspace.categoryPath(c.id)}
+              </option>
+            ))}
           </select>
           <Button onClick={() => void move()}>カテゴリを付け替える</Button>
         </Card>

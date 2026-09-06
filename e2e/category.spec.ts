@@ -251,4 +251,119 @@ test.describe('カテゴリの管理', () => {
     expect(at('食費')).toBeLessThan(at('趣味'));
     expect(at('趣味')).toBeLessThan(at('未分類'));
   });
+  test('列15 大分類の下に小分類を作れる', async ({ signedIn, users }) => {
+    const parent = await seedCategory({ ownerId: users.taro, name: '食費' });
+
+    await signedIn.goto('/categories');
+    await signedIn.getByLabel('親カテゴリ').selectOption({ label: '食費' });
+    await signedIn.getByLabel('カテゴリ名').fill('外食');
+    await signedIn.getByRole('button', { name: '追加' }).click();
+
+    await expect(signedIn.getByLabel('外食の名前')).toBeVisible();
+    const { data } = await adminClient()
+      .from('categories')
+      .select('parent_id, share_group_id, owner_id, kind')
+      .eq('name', '外食')
+      .single();
+    // 共有範囲と収支区分は親から引き継ぐ
+    expect(data).toEqual({
+      parent_id: parent,
+      share_group_id: null,
+      owner_id: users.taro,
+      kind: 'expense',
+    });
+
+    // 取引の入力では『大分類 / 小分類』で選べる
+    await signedIn.goto('/new');
+    await expect(signedIn.getByLabel('カテゴリ')).toContainText('個人 / 食費 / 外食');
+  });
+
+  test('列20 小分類を削除すると取引が親へ移る', async ({ signedIn, users }) => {
+    const parent = await seedCategory({ ownerId: users.taro, name: '食費' });
+    const child = await seedCategory({ ownerId: users.taro, name: '外食', parentId: parent });
+    const tx = await seedTransaction({
+      categoryId: child,
+      payerId: users.taro,
+      createdBy: users.taro,
+      occurredOn: today(),
+      amount: 780,
+      memo: '昼食',
+      splits: [{ userId: users.taro, amount: 780 }],
+    });
+
+    await signedIn.goto('/categories');
+    await signedIn.getByLabel('外食を削除').click();
+
+    await expect(signedIn.getByLabel('外食の名前')).toHaveCount(0);
+    const { data } = await adminClient()
+      .from('transactions')
+      .select('category_id')
+      .eq('id', tx)
+      .single();
+    // 未分類ではなく親の食費へ移る
+    expect((data as { category_id: string }).category_id).toBe(parent);
+  });
+
+  test('列21 小分類が残っている大分類は削除できない', async ({ signedIn, users }) => {
+    const parent = await seedCategory({ ownerId: users.taro, name: '食費' });
+    await seedCategory({ ownerId: users.taro, name: '外食', parentId: parent });
+
+    await signedIn.goto('/categories');
+    await signedIn.getByLabel('食費を削除').click();
+
+    await expect(signedIn.getByRole('alert')).toContainText('小分類');
+    await expect(signedIn.getByLabel('食費の名前')).toBeVisible();
+    const { count } = await adminClient()
+      .from('categories')
+      .select('id', { count: 'exact', head: true })
+      .eq('id', parent);
+    expect(count).toBe(1);
+  });
+
+  test('列22 親をアーカイブすると小分類も候補から外れる', async ({ signedIn, users }) => {
+    const parent = await seedCategory({ ownerId: users.taro, name: '食費' });
+    const child = await seedCategory({ ownerId: users.taro, name: '外食', parentId: parent });
+
+    await signedIn.goto('/categories');
+    await signedIn.getByLabel('食費をアーカイブ').click();
+    await expect(signedIn.getByText('アーカイブ済み')).toBeVisible();
+
+    // 子の is_archived は書き換えない
+    const { data } = await adminClient()
+      .from('categories')
+      .select('is_archived')
+      .eq('id', child)
+      .single();
+    expect((data as { is_archived: boolean }).is_archived).toBe(false);
+
+    // それでも新規入力の候補からは外れる
+    await signedIn.goto('/new');
+    await expect(signedIn.getByLabel('カテゴリ')).not.toContainText('外食');
+    await expect(signedIn.getByLabel('カテゴリ')).not.toContainText('食費');
+  });
+
+  test('列23 小分類は同じ親の中で並べ替わる', async ({ signedIn, users }) => {
+    const parent = await seedCategory({ ownerId: users.taro, name: '食費' });
+    await seedCategory({ ownerId: users.taro, name: '自炊', parentId: parent, sortOrder: 10 });
+    await seedCategory({ ownerId: users.taro, name: '外食', parentId: parent, sortOrder: 20 });
+
+    await signedIn.goto('/categories');
+    await signedIn.getByRole('button', { name: '外食を上へ' }).click();
+
+    await expect
+      .poll(async () => {
+        const [外食, 自炊] = await Promise.all([categoryOf('外食'), categoryOf('自炊')]);
+        return 外食.sort_order < 自炊.sort_order;
+      })
+      .toBe(true);
+    // 親の表示順は動かない
+    expect((await categoryOf('食費')).sort_order).toBe(10);
+
+    await signedIn.goto('/new');
+    const select = signedIn.getByLabel('カテゴリ');
+    await expect(select).toContainText('外食');
+    const options = await select.locator('option').allTextContents();
+    const at = (name: string) => options.findIndex((text) => text.includes(name));
+    expect(at('外食')).toBeLessThan(at('自炊'));
+  });
 });

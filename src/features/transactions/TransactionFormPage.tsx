@@ -21,6 +21,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth, useWorkspace } from '../app/context';
 import { validateTransaction } from './validation';
 import type { Kind } from '../categories/name';
+import { selectableCategories } from '../categories/tree';
 
 const SHARED = '__shared__';
 
@@ -90,7 +91,7 @@ export function TransactionFormPage() {
   useEffect(() => {
     if (id !== undefined || categoryId !== '') return;
     const preferred = workspace.profiles.find((p) => p.id === selfId)?.default_category_id ?? null;
-    const usable = workspace.categories.filter((c) => c.kind === kind && !c.is_archived);
+    const usable = selectableCategories(workspace.tree.filter((c) => c.kind === kind));
     const next = usable.find((c) => c.id === preferred) ?? usable[0];
     if (next !== undefined) setCategoryId(next.id);
   }, [id, categoryId, kind, workspace, selfId]);
@@ -137,7 +138,11 @@ export function TransactionFormPage() {
     if (isPersonal && payer !== selfId) setPayer(selfId);
   }, [isPersonal, payer, selfId]);
 
-  const categoriesOfKind = workspace.categories.filter((c) => c.kind === kind && !c.is_archived);
+  // 親がアーカイブ済みなら小分類も候補から外す（§3.4.1）。並びは大分類の直後に小分類
+  const categoriesOfKind = useMemo(
+    () => selectableCategories(workspace.tree.filter((c) => c.kind === kind)),
+    [workspace.tree, kind],
+  );
 
   // 式のときだけ計算結果を欄の下に出す。ただの数字なら何も出さない（列16）
   const isExpression = amountText.trim() !== '' && isAmountExpression(amountText);
@@ -259,7 +264,8 @@ export function TransactionFormPage() {
           <option value="">選んでください</option>
           {categoriesOfKind.map((c) => (
             <option key={c.id} value={c.id}>
-              {workspace.scopeLabel(c)} / {c.name}
+              {workspace.scopeLabel({ share_group_id: c.shareGroupId })} /{' '}
+              {workspace.categoryPath(c.id)}
             </option>
           ))}
         </select>

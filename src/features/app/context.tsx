@@ -16,7 +16,9 @@ import {
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabase';
 import { loadWorkspace, type Workspace } from '../../lib/db';
-import { scopeKey, type CategoryLike } from '../categories/name';
+import { scopeKey } from '../categories/name';
+import { categoryPath, type TreeCategory } from '../categories/tree';
+import { toTreeCategory } from './model';
 import type { MemberLike } from '../groups/members';
 
 type AuthState = {
@@ -61,7 +63,10 @@ export type WorkspaceState = Workspace & {
   groupName: (shareGroupId: string) => string;
   /** 共有範囲の見出し。グループ名、または「個人」 */
   scopeLabel: (item: { share_group_id: string | null }) => string;
-  categoryLike: (id: string) => CategoryLike | null;
+  /** カテゴリの階層を扱う形（tree.ts）。画面ごとに作り直さない */
+  tree: TreeCategory[];
+  /** 表示名。小分類は『大分類 / 小分類』（§3.4.1） */
+  categoryPath: (id: string) => string;
 };
 
 const WorkspaceContext = createContext<WorkspaceState | null>(null);
@@ -91,10 +96,18 @@ export function WorkspaceProvider({ children, userId }: { children: ReactNode; u
           sortOrder: m.sort_order,
         }));
 
+    const tree = data.categories.map(toTreeCategory);
+    const byId = new Map(tree.map((c) => [c.id, c]));
+
     return {
       ...data,
       reload,
       membersOf,
+      tree,
+      categoryPath: (id) => {
+        const found = byId.get(id);
+        return found === undefined ? '' : categoryPath(tree, found);
+      },
       myGroupIds: data.members.filter((m) => m.user_id === userId).map((m) => m.share_group_id),
       displayName: (id) =>
         id === null ? '共用' : (data.profiles.find((p) => p.id === id)?.display_name ?? '不明'),
@@ -103,18 +116,6 @@ export function WorkspaceProvider({ children, userId }: { children: ReactNode; u
         item.share_group_id === null
           ? '個人'
           : (data.groups.find((g) => g.id === item.share_group_id)?.name ?? '不明'),
-      categoryLike: (id) => {
-        const found = data.categories.find((c) => c.id === id);
-        if (found === undefined) return null;
-        return {
-          id: found.id,
-          shareGroupId: found.share_group_id,
-          ownerId: found.owner_id,
-          kind: found.kind,
-          name: found.name,
-          isArchived: found.is_archived,
-        };
-      },
     };
   }, [data, reload, userId]);
 

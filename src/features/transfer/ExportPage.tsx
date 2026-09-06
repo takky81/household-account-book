@@ -51,6 +51,7 @@ export function ExportPage() {
       const text = categoryCsv(
         workspace.categories.map((c) => ({
           id: c.id,
+          parentId: c.parent_id,
           shareGroupId: c.share_group_id,
           ownerId: c.owner_id,
           kind: c.kind,
@@ -71,6 +72,7 @@ export function ExportPage() {
         budgets.map((b) => ({ categoryId: b.category_id, month: b.month, amount: b.amount })),
         workspace.categories.map((c) => ({
           id: c.id,
+          parentId: c.parent_id,
           shareGroupId: c.share_group_id,
           ownerId: c.owner_id,
           kind: c.kind,

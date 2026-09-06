@@ -5,7 +5,6 @@ import { Button, Card, ErrorText, Note, Tabs } from '../../components/ui';
 import { createCategory, importTransactions, loadTransactions } from '../../lib/db';
 import { useAuth, useWorkspace } from '../app/context';
 import { analyzeImport, type ImportResult } from './import';
-import { toCategoryLike } from '../app/model';
 
 export function ImportPage() {
   const workspace = useWorkspace();
@@ -30,7 +29,7 @@ export function ImportPage() {
         profiles: workspace.profiles.map((p) => ({ id: p.id, displayName: p.display_name })),
         groups: workspace.groups,
         members,
-        categories: workspace.categories.map(toCategoryLike),
+        categories: workspace.tree,
         existing: existing.map((tx) => ({
           occurredOn: tx.occurred_on,
           categoryId: tx.category_id,
@@ -55,7 +54,8 @@ export function ImportPage() {
       );
       const seen = new Set<string>();
       for (const category of toCreate) {
-        const key = `${category.shareGroupId ?? ''}:${category.kind}:${category.name}`;
+        // 親が違えば同じ名前でも別のカテゴリ（§3.4.1）
+        const key = `${category.shareGroupId ?? ''}:${category.kind}:${category.parentId ?? ''}:${category.name}`;
         if (seen.has(key)) continue;
         seen.add(key);
         await createCategory({
@@ -64,6 +64,7 @@ export function ImportPage() {
           name: category.name,
           color: '#4a6fa5',
           sortOrder: 100,
+          parentId: category.parentId,
         });
       }
       if (toCreate.length > 0) {

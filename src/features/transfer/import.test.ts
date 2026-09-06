@@ -18,10 +18,10 @@ const context = (over: Partial<ImportContext> = {}): ImportContext => ({
     ],
   },
   categories: [
-    { id: 'c1', shareGroupId: 'g1', ownerId: null, kind: 'expense', name: '家賃', isArchived: false },
-    { id: 'c2', shareGroupId: 'g1', ownerId: null, kind: 'expense', name: '未分類', isArchived: false, isSystem: true },
-    { id: 'c3', shareGroupId: null, ownerId: 'u1', kind: 'expense', name: '食費', isArchived: false },
-    { id: 'c4', shareGroupId: null, ownerId: 'u1', kind: 'expense', name: '未分類', isArchived: false, isSystem: true },
+    { id: 'c1', parentId: null, shareGroupId: 'g1', ownerId: null, kind: 'expense', name: '家賃', isArchived: false },
+    { id: 'c2', parentId: null, shareGroupId: 'g1', ownerId: null, kind: 'expense', name: '未分類', isArchived: false, isSystem: true },
+    { id: 'c3', parentId: null, shareGroupId: null, ownerId: 'u1', kind: 'expense', name: '食費', isArchived: false },
+    { id: 'c4', parentId: null, shareGroupId: null, ownerId: 'u1', kind: 'expense', name: '未分類', isArchived: false, isSystem: true },
   ],
   existing: [],
   unknownCategory: 'uncategorized',
@@ -134,6 +134,7 @@ describe('analyzeImport', () => {
       ownerId: null,
       kind: 'expense',
       name: '日用品',
+      parentId: null,
     });
   });
 
@@ -188,5 +189,87 @@ describe('analyzeImport', () => {
     );
     const result = analyzeImport(text, context());
     expect(result.counts.ok).toBe(1);
+  });
+});
+
+describe('analyzeImport（小分類）', () => {
+  const withSub = '日付,収支,共有範囲,カテゴリ,小分類,金額,支払者,負担,備考';
+  const 外食 = { id: 'c5', parentId: 'c3', shareGroupId: null, ownerId: 'u1', kind: 'expense' as const, name: '外食', isArchived: false };
+  const subContext = (over: Partial<ImportContext> = {}) => {
+    const base = context(over);
+    return { ...base, categories: [...base.categories, 外食] };
+  };
+  const runSub = (lines: string[], over: Partial<ImportContext> = {}) =>
+    analyzeImport([withSub, ...lines].join('\r\n') + '\r\n', subContext(over));
+
+  it('列17 小分類つきの行はその小分類に付く', () => {
+    const result = runSub(['2026-08-31,支出,個人,食費,外食,780,たかし,,昼食']);
+    expect(result.counts).toMatchObject({ ok: 1, error: 0 });
+    expect(result.entries[0]).toMatchObject({ status: 'ok', payload: { categoryId: 'c5' } });
+  });
+
+  it('列17 小分類が空欄なら大分類そのものに付く', () => {
+    const result = runSub(['2026-08-31,支出,個人,食費,,780,たかし,,昼食']);
+    expect(result.entries[0]).toMatchObject({ status: 'ok', payload: { categoryId: 'c3' } });
+  });
+
+  it('列18 小分類の列が無いファイルもそのまま取り込める', () => {
+    const result = analyzeImport(
+      [header, '2026-08-31,支出,個人,食費,780,たかし,,昼食'].join('\r\n') + '\r\n',
+      subContext(),
+    );
+    expect(result.counts).toMatchObject({ ok: 1, error: 0 });
+    expect(result.entries[0]).toMatchObject({ status: 'ok', payload: { categoryId: 'c3' } });
+  });
+
+  it('列19 未知の小分類は既存の大分類の下に作る', () => {
+    const result = runSub(['2026-08-31,支出,個人,食費,自炊,780,たかし,,'], {
+      unknownCategory: 'create',
+    });
+    expect(result.entries[0]).toMatchObject({
+      status: 'ok',
+      payload: {
+        categoryId: null,
+        newCategory: { parentId: 'c3', name: '自炊', shareGroupId: null, ownerId: 'u1', kind: 'expense' },
+      },
+    });
+  });
+
+  it('列19 大分類ごと未知なら、まず大分類を作る', () => {
+    const result = runSub(['2026-08-31,支出,個人,交際費,飲み会,780,たかし,,'], {
+      unknownCategory: 'create',
+    });
+    expect(result.entries[0]).toMatchObject({
+      status: 'ok',
+      payload: { newCategory: { parentId: null, name: '交際費' } },
+    });
+  });
+
+  it('列19 未分類にする選択なら小分類は捨てて未分類へ付ける', () => {
+    const result = runSub(['2026-08-31,支出,個人,交際費,飲み会,780,たかし,,'], {
+      unknownCategory: 'uncategorized',
+    });
+    expect(result.entries[0]).toMatchObject({
+      status: 'ok',
+      payload: { categoryId: 'c4', newCategory: null },
+    });
+  });
+
+  it('列20 小分類が違えば重複にしない', () => {
+    const existing = [
+      {
+        occurredOn: '2026-08-31',
+        categoryId: 'c3',
+        amount: 780,
+        payerId: 'u1',
+        memo: '昼食',
+        splits: [{ userId: 'u1', amount: 780 }],
+      },
+    ];
+    const 同じ = runSub(['2026-08-31,支出,個人,食費,,780,たかし,,昼食'], { existing });
+    expect(同じ.counts).toMatchObject({ ok: 0, skipped: 1 });
+
+    const 小分類つき = runSub(['2026-08-31,支出,個人,食費,外食,780,たかし,,昼食'], { existing });
+    expect(小分類つき.counts).toMatchObject({ ok: 1, skipped: 0 });
   });
 });
