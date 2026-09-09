@@ -234,10 +234,36 @@ describe('monthDiff', () => {
     const previous = aggregateMonth({ ...common, monthKey: '2026-07' });
     expect(monthDiff(current, previous)).toBe(124200 - 100000);
   });
+
+  it('列12 同じカテゴリでも共有範囲が違えば内訳の行を分ける', () => {
+    // カテゴリは全ユーザー共通なので、夫婦の食費と個人の食費が同じ id を指す
+    const sharedFood: AggregateTx = { ...food, categoryId: 'c-food', id: 't10' };
+    const ownFood: AggregateTx = { ...lunch, categoryId: 'c-food', id: 't11' };
+    const result = aggregateMonth({
+      transactions: [sharedFood, ownFood],
+      monthKey: '2026-08',
+      scope: { kind: 'all' },
+      basis: 'burden',
+      selfId: taro,
+      members,
+    });
+
+    expect(result.byCategory).toHaveLength(2);
+    const group = result.byCategory.find((r) => r.shareGroupId === 夫婦)!;
+    const own = result.byCategory.find((r) => r.shareGroupId === null)!;
+    expect(group.amount).toBe(2100);
+    expect(own.amount).toBe(780);
+    // 行の印がどちらの共有範囲を指すか決まっている
+    expect(group.scopeLabel).toBe('group');
+    expect(own.scopeLabel).toBe('individual');
+    // 円グラフの色は行ごとに引けること
+    expect(group.key).not.toBe(own.key);
+  });
 });
 
 describe('categorySlices', () => {
   const category = (id: string, amount: number): CategoryTotal => ({
+    key: id,
     categoryId: id,
     name: id,
     scopeLabel: 'individual',

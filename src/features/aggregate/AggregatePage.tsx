@@ -138,10 +138,10 @@ export function AggregatePage() {
           {slices.length > 1 && <CategoryPie slices={slices} />}
           <ul className="flex min-w-[16rem] flex-1 flex-col gap-1">
             {totals.byCategory.map((row) => {
-              const slice = colorOf.get(row.categoryId);
-              const open = expanded.includes(row.categoryId);
+              const slice = colorOf.get(row.key);
+              const open = expanded.includes(row.key);
               return (
-                <li key={row.categoryId} className="flex flex-col text-sm">
+                <li key={row.key} className="flex flex-col text-sm">
                   <div className="flex items-center justify-between">
                     <span className="flex items-center gap-1">
                       <span
@@ -163,7 +163,7 @@ export function AggregatePage() {
                           aria-label={`${row.name}の内訳`}
                           aria-expanded={open}
                           className="text-xs text-[var(--c-muted)]"
-                          onClick={() => toggleExpanded(row.categoryId)}
+                          onClick={() => toggleExpanded(row.key)}
                         >
                           {open ? '▲' : '▼'}
                         </button>
