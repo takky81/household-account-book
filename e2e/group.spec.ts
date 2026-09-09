@@ -26,7 +26,7 @@ async function splitCount(transactionId: string): Promise<number> {
 }
 
 test.describe('共有グループの管理', () => {
-  test('列1 自分を含むグループを作ると未分類が2件できる', async ({ signedIn, users }) => {
+  test('列1 自分を含むグループを作るとメンバーが登録される', async ({ signedIn, users }) => {
     await signedIn.goto('/groups');
     await signedIn.getByLabel('グループ名').fill('夫婦');
     await signedIn.getByRole('checkbox', { name: 'hana' }).check();
@@ -41,10 +41,10 @@ test.describe('共有グループの管理', () => {
     const id = (data as { id: string }).id;
     expect((await memberIds(id)).sort()).toEqual([users.taro, users.hana].sort());
 
+    // 未分類は全ユーザー共通で収支区分ごとに1件。グループを作っても増えない（§3.4）
     const { count } = await adminClient()
       .from('categories')
       .select('id', { count: 'exact', head: true })
-      .eq('share_group_id', id)
       .eq('is_system', true);
     expect(count).toBe(2);
   });
@@ -86,9 +86,10 @@ test.describe('共有グループの管理', () => {
     users,
   }) => {
     const group = await seedGroup(users);
-    const category = await seedCategory({ shareGroupId: group, name: '家賃' });
+    const category = await seedCategory({ name: '家賃' });
     const tx = await seedTransaction({
       categoryId: category,
+      shareGroupId: group,
       payerId: users.taro,
       createdBy: users.taro,
       occurredOn: '2026-09-01',
@@ -121,9 +122,10 @@ test.describe('共有グループの管理', () => {
 
   test('列9 メンバーを外しても過去の取引は残る', async ({ signedIn, users }) => {
     const group = await seedGroup(users);
-    const category = await seedCategory({ shareGroupId: group, name: '家賃' });
+    const category = await seedCategory({ name: '家賃' });
     const tx = await seedTransaction({
       categoryId: category,
+      shareGroupId: group,
       payerId: users.hana,
       createdBy: users.taro,
       occurredOn: '2026-09-01',
@@ -160,9 +162,10 @@ test.describe('共有グループの管理', () => {
 
   test('列11 負担割合を変えても過去の取引は変わらない', async ({ signedIn, users }) => {
     const group = await seedGroup(users);
-    const category = await seedCategory({ shareGroupId: group, name: '家賃' });
+    const category = await seedCategory({ name: '家賃' });
     const tx = await seedTransaction({
       categoryId: category,
+      shareGroupId: group,
       payerId: users.taro,
       createdBy: users.taro,
       occurredOn: '2026-09-01',
@@ -199,7 +202,10 @@ test.describe('共有グループの管理', () => {
 
     // 以後の入力には効く（3:1 で 750 / 250）
     await signedIn.goto('/new');
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '夫婦 / 家賃' });
+    await signedIn.getByRole('group', { name: '共有範囲' })
+      .getByRole('button', { name: '夫婦' })
+      .click();
+    await signedIn.getByLabel('カテゴリ').selectOption({ label: '家賃' });
     await signedIn.getByLabel('金額').fill('1000');
     await expect(signedIn.getByLabel('taroの負担')).toHaveValue('750');
   });
@@ -213,35 +219,26 @@ test.describe('共有グループの管理', () => {
     await expect(signedIn.getByLabel('夫婦の名前')).toHaveCount(0);
     expect(await groupNames()).toEqual([]);
     expect(await memberIds(group)).toEqual([]);
-    const { count } = await adminClient()
-      .from('categories')
-      .select('id', { count: 'exact', head: true })
-      .eq('share_group_id', group);
-    expect(count).toBe(0);
   });
 
-  test('列13 カテゴリが残るグループは削除できない', async ({ signedIn, users }) => {
-    const group = await seedGroup(users);
-    await seedCategory({ shareGroupId: group, name: '家賃' });
+  test('列13 カテゴリが残っていてもグループは削除できる', async ({ signedIn, users }) => {
+    // カテゴリは全ユーザー共通でグループに属さないので、削除の妨げにならない（§2.7）
+    await seedGroup(users);
+    await seedCategory({ name: '家賃' });
 
     await signedIn.goto('/groups');
     await signedIn.getByRole('button', { name: 'グループを削除' }).click();
 
-    await expect(signedIn.getByRole('alert')).toContainText('カテゴリが残っている');
-    expect(await groupNames()).toEqual(['夫婦']);
+    await expect(signedIn.getByLabel('夫婦の名前')).toHaveCount(0);
+    expect(await groupNames()).toEqual([]);
   });
 
   test('列14 取引が残るグループは削除できない', async ({ signedIn, users }) => {
     const group = await seedGroup(users);
-    const { data } = await adminClient()
-      .from('categories')
-      .select('id')
-      .eq('share_group_id', group)
-      .eq('kind', 'expense')
-      .eq('is_system', true)
-      .single();
+    const category = await seedCategory({ name: '家賃' });
     await seedTransaction({
-      categoryId: (data as { id: string }).id,
+      categoryId: category,
+      shareGroupId: group,
       payerId: users.taro,
       createdBy: users.taro,
       occurredOn: '2026-09-01',

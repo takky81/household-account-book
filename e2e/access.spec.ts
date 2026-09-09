@@ -13,10 +13,11 @@ test.describe('アクセス制御', () => {
     users,
   }) => {
     const group = await seedGroup(users);
-    const shared = await seedCategory({ shareGroupId: group, name: '家賃' });
-    const own = await seedCategory({ ownerId: users.taro, name: '食費' });
+    const shared = await seedCategory({ name: '家賃' });
+    const own = await seedCategory({ name: '食費' });
     await seedTransaction({
       categoryId: shared,
+      shareGroupId: group,
       payerId: users.taro,
       createdBy: users.taro,
       occurredOn: today(),
@@ -29,6 +30,7 @@ test.describe('アクセス制御', () => {
     });
     await seedTransaction({
       categoryId: own,
+      ownerId: users.taro,
       payerId: users.taro,
       createdBy: users.taro,
       occurredOn: today(),
@@ -46,9 +48,10 @@ test.describe('アクセス制御', () => {
 
   test('列3 属さないグループのカテゴリも取引も見えない', async ({ page, users }) => {
     const group = await seedGroup(users);
-    const shared = await seedCategory({ shareGroupId: group, name: '家賃' });
+    const shared = await seedCategory({ name: '家賃' });
     await seedTransaction({
       categoryId: shared,
+      shareGroupId: group,
       payerId: users.taro,
       createdBy: users.taro,
       occurredOn: today(),

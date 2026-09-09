@@ -28,11 +28,14 @@ function today(): string {
 
 test.describe('取引の入力と編集', () => {
   test('列1 共有カテゴリの取引を入力すると既定割合で按分される', async ({ signedIn, users }) => {
-    const group = await seedGroup(users);
-    await seedCategory({ shareGroupId: group, name: '家賃' });
+    await seedGroup(users);
+    await seedCategory({ name: '家賃' });
 
     await signedIn.goto('/new');
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '夫婦 / 家賃' });
+    await signedIn.getByRole('group', { name: '共有範囲' })
+      .getByRole('button', { name: '夫婦' })
+      .click();
+    await signedIn.getByLabel('カテゴリ').selectOption({ label: '家賃' });
     await signedIn.getByLabel('金額').fill('1001');
     await signedIn.getByRole('button', { name: '保存', exact: true }).click();
 
@@ -43,10 +46,10 @@ test.describe('取引の入力と編集', () => {
   });
 
   test('列3 個人カテゴリの取引は本人1行の負担になる', async ({ signedIn, users }) => {
-    await seedCategory({ ownerId: users.taro, name: '食費' });
+    await seedCategory({ name: '食費' });
 
     await signedIn.goto('/new');
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '個人 / 食費' });
+    await signedIn.getByLabel('カテゴリ').selectOption({ label: '食費' });
     await signedIn.getByLabel('金額').fill('780');
     await signedIn.getByRole('button', { name: '保存', exact: true }).click();
 
@@ -56,27 +59,33 @@ test.describe('取引の入力と編集', () => {
     expect(splits).toEqual([{ user_id: users.taro, amount: 780 }]);
   });
 
-  test('列15 個人カテゴリでは負担の入力欄を出さない', async ({ signedIn, users }) => {
-    await seedCategory({ ownerId: users.taro, name: '日用品' });
-    const group = await seedGroup(users);
-    await seedCategory({ shareGroupId: group, name: '日用品' });
+  test('列15 個人の共有範囲では負担の入力欄を出さない', async ({ signedIn, users }) => {
+    // カテゴリは1件でよい。負担の欄が出るかどうかは共有範囲だけで決まる（§2.4）
+    await seedGroup(users);
+    await seedCategory({ name: '日用品' });
 
     await signedIn.goto('/new');
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '個人 / 日用品' });
+    await signedIn.getByLabel('カテゴリ').selectOption({ label: '日用品' });
     await signedIn.getByLabel('金額').fill('780');
+    // 既定は個人なので出ない
     await expect(signedIn.getByLabel('taroの負担')).toHaveCount(0);
 
-    // 共有カテゴリに変えれば出る
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '夫婦 / 日用品' });
+    // 共有範囲を変えれば出る。カテゴリは選び直さない
+    await signedIn.getByRole('group', { name: '共有範囲' })
+      .getByRole('button', { name: '夫婦' })
+      .click();
     await expect(signedIn.getByLabel('taroの負担')).toHaveValue('390');
   });
 
   test('列7 負担を手で分けるとその通りに保存される', async ({ signedIn, users }) => {
-    const group = await seedGroup(users);
-    await seedCategory({ shareGroupId: group, name: '家賃' });
+    await seedGroup(users);
+    await seedCategory({ name: '家賃' });
 
     await signedIn.goto('/new');
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '夫婦 / 家賃' });
+    await signedIn.getByRole('group', { name: '共有範囲' })
+      .getByRole('button', { name: '夫婦' })
+      .click();
+    await signedIn.getByLabel('カテゴリ').selectOption({ label: '家賃' });
     await signedIn.getByLabel('金額').fill('1000');
     await signedIn.getByLabel('taroの負担').fill('700');
     await signedIn.getByLabel('hanaの負担').fill('300');
@@ -97,11 +106,14 @@ test.describe('取引の入力と編集', () => {
   });
 
   test('列8 負担の合計が合わないと保存できない', async ({ signedIn, users }) => {
-    const group = await seedGroup(users);
-    await seedCategory({ shareGroupId: group, name: '家賃' });
+    await seedGroup(users);
+    await seedCategory({ name: '家賃' });
 
     await signedIn.goto('/new');
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '夫婦 / 家賃' });
+    await signedIn.getByRole('group', { name: '共有範囲' })
+      .getByRole('button', { name: '夫婦' })
+      .click();
+    await signedIn.getByLabel('カテゴリ').selectOption({ label: '家賃' });
     await signedIn.getByLabel('金額').fill('1000');
     await signedIn.getByLabel('taroの負担').fill('100');
     await signedIn.getByRole('button', { name: '保存', exact: true }).click();
@@ -115,9 +127,10 @@ test.describe('取引の入力と編集', () => {
 
   test('列11 脱退した人が支払者の取引でも備考を直せる', async ({ signedIn, users }) => {
     const group = await seedGroup(users);
-    const category = await seedCategory({ shareGroupId: group, name: '家賃' });
+    const category = await seedCategory({ name: '家賃' });
     const id = await seedTransaction({
       categoryId: category,
+      shareGroupId: group,
       payerId: users.hana,
       createdBy: users.taro,
       occurredOn: '2026-08-31',
@@ -148,7 +161,7 @@ test.describe('取引の入力と編集', () => {
   });
 
   test('列12 取引を削除すると負担も消える', async ({ signedIn, users }) => {
-    const category = await systemCategoryOf(users.taro, 'expense');
+    const category = await systemCategoryOf('expense');
     const id = await seedTransaction({
       categoryId: category,
       payerId: users.taro,
@@ -170,12 +183,11 @@ test.describe('取引の入力と編集', () => {
 
   test('列13 保存して続けて入力すると日付とカテゴリが残り金額が空になる', async ({
     signedIn,
-    users,
   }) => {
-    await seedCategory({ ownerId: users.taro, name: '食費' });
+    await seedCategory({ name: '食費' });
 
     await signedIn.goto('/new');
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '個人 / 食費' });
+    await signedIn.getByLabel('カテゴリ').selectOption({ label: '食費' });
     await signedIn.getByLabel('金額').fill('780');
     await signedIn.getByLabel('備考').fill('昼食');
     await signedIn.getByRole('button', { name: '保存して続けて入力' }).click();
@@ -188,7 +200,7 @@ test.describe('取引の入力と編集', () => {
   });
 
   test('列13 編集では続けて入力できない', async ({ signedIn, users }) => {
-    const category = await systemCategoryOf(users.taro, 'expense');
+    const category = await systemCategoryOf('expense');
     const id = await seedTransaction({
       categoryId: category,
       payerId: users.taro,
@@ -209,12 +221,11 @@ test.describe('取引の入力と編集', () => {
 
   test('列16 金額に式を入れると結果が欄の下に出て、その値で保存される', async ({
     signedIn,
-    users,
   }) => {
-    await seedCategory({ ownerId: users.taro, name: '外食' });
+    await seedCategory({ name: '外食' });
 
     await signedIn.goto('/new');
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '個人 / 外食' });
+    await signedIn.getByLabel('カテゴリ').selectOption({ label: '外食' });
     await signedIn.getByLabel('金額').fill('1200+800');
     await expect(signedIn.getByText('= 2,000')).toBeVisible();
 
@@ -223,11 +234,11 @@ test.describe('取引の入力と編集', () => {
     expect((await latestTransaction()).amount).toBe(2000);
   });
 
-  test('列16 演算子ボタンで式を組み立てられる', async ({ signedIn, users }) => {
-    await seedCategory({ ownerId: users.taro, name: '交通費' });
+  test('列16 演算子ボタンで式を組み立てられる', async ({ signedIn }) => {
+    await seedCategory({ name: '交通費' });
 
     await signedIn.goto('/new');
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '個人 / 交通費' });
+    await signedIn.getByLabel('カテゴリ').selectOption({ label: '交通費' });
     await signedIn.getByLabel('金額').fill('420');
     await signedIn.getByRole('button', { name: '×' }).click();
     await signedIn.getByLabel('金額').pressSequentially('3');
@@ -235,11 +246,11 @@ test.describe('取引の入力と編集', () => {
     await expect(signedIn.getByText('= 1,260')).toBeVisible();
   });
 
-  test('列17 計算できない式では保存できない', async ({ signedIn, users }) => {
-    await seedCategory({ ownerId: users.taro, name: '雑貨' });
+  test('列17 計算できない式では保存できない', async ({ signedIn }) => {
+    await seedCategory({ name: '雑貨' });
 
     await signedIn.goto('/new');
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '個人 / 雑貨' });
+    await signedIn.getByLabel('カテゴリ').selectOption({ label: '雑貨' });
     await signedIn.getByLabel('金額').fill('1200+');
     await expect(signedIn.getByText('計算できません')).toBeVisible();
 
@@ -247,12 +258,12 @@ test.describe('取引の入力と編集', () => {
     await expect(signedIn.getByRole('alert')).toBeVisible();
     await expect(signedIn.getByRole('heading', { name: '取引を入力' })).toBeVisible();
   });
-  test('列18 小分類を持つ大分類はそのまま選んで保存できる', async ({ signedIn, users }) => {
-    const parent = await seedCategory({ ownerId: users.taro, name: '食費' });
-    await seedCategory({ ownerId: users.taro, name: '外食', parentId: parent });
+  test('列18 小分類を持つ大分類はそのまま選んで保存できる', async ({ signedIn }) => {
+    const parent = await seedCategory({ name: '食費' });
+    await seedCategory({ name: '外食', parentId: parent });
 
     await signedIn.goto('/new');
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '個人 / 食費' });
+    await signedIn.getByLabel('カテゴリ').selectOption({ label: '食費' });
     await signedIn.getByLabel('金額').fill('500');
     await signedIn.getByRole('button', { name: '保存', exact: true }).click();
 
@@ -266,12 +277,15 @@ test.describe('取引の入力と編集', () => {
   });
 
   test('列19 小分類を選ぶと共有範囲と負担は親と同じになる', async ({ signedIn, users }) => {
-    const group = await seedGroup(users);
-    const parent = await seedCategory({ shareGroupId: group, name: '食費' });
-    const child = await seedCategory({ shareGroupId: group, name: '外食', parentId: parent });
+    await seedGroup(users);
+    const parent = await seedCategory({ name: '食費' });
+    const child = await seedCategory({ name: '外食', parentId: parent });
 
     await signedIn.goto('/new');
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '夫婦 / 食費 / 外食' });
+    await signedIn.getByRole('group', { name: '共有範囲' })
+      .getByRole('button', { name: '夫婦' })
+      .click();
+    await signedIn.getByLabel('カテゴリ').selectOption({ label: '食費 / 外食' });
     await signedIn.getByLabel('金額').fill('1000');
     // 親と同じ共有範囲なので、夫婦の既定割合で按分される
     await expect(signedIn.getByLabel('taroの負担')).toHaveValue('500');

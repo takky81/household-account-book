@@ -97,29 +97,37 @@ export async function seedGroup(users: TestUsers, name = '夫婦'): Promise<stri
     { share_group_id: id, user_id: users.hana, default_weight: 1, sort_order: 20 },
   ]);
   if (members.error !== null) throw members.error;
-  const systemCategories = await db.from('categories').insert([
-    { share_group_id: id, kind: 'expense', name: '未分類', is_system: true, sort_order: 9999 },
-    { share_group_id: id, kind: 'income', name: '未分類', is_system: true, sort_order: 9999 },
-  ]);
-  if (systemCategories.error !== null) throw systemCategories.error;
+  // 未分類は全ユーザー共通で収支区分ごとに1件（§3.4）。グループごとには作らない
   return id;
 }
 
 /** カテゴリを1件作る。 */
+/**
+ * 呼び出した人が入っていないグループ。参照できない共有範囲を再現するために使う。
+ */
+export async function seedForeignGroup(name: string, memberId: string): Promise<string> {
+  const db = adminClient();
+  const group = await db.from('share_groups').insert({ name }).select('id').single();
+  if (group.error !== null) throw group.error;
+  const id = group.data.id as string;
+  const member = await db
+    .from('share_group_members')
+    .insert({ share_group_id: id, user_id: memberId, default_weight: 1, sort_order: 10 });
+  if (member.error !== null) throw member.error;
+  return id;
+}
+
+/** カテゴリを1件作る。カテゴリは全ユーザー共通なので共有範囲を持たない（§2.4）。 */
 export async function seedCategory(input: {
-  shareGroupId?: string | null;
-  ownerId?: string | null;
   kind?: 'income' | 'expense';
   name: string;
-  /** 小分類にするときの親。共有範囲と収支区分は親からコピーされる */
+  /** 小分類にするときの親。収支区分は親からコピーされる */
   parentId?: string | null;
   sortOrder?: number;
 }): Promise<string> {
   const { data, error } = await adminClient()
     .from('categories')
     .insert({
-      share_group_id: input.shareGroupId ?? null,
-      owner_id: input.ownerId ?? null,
       kind: input.kind ?? 'expense',
       name: input.name,
       parent_id: input.parentId ?? null,
@@ -134,6 +142,9 @@ export async function seedCategory(input: {
 /** 取引を1件作る。負担は明示する。 */
 export async function seedTransaction(input: {
   categoryId: string;
+  /** 共有範囲。グループなら shareGroupId、個人なら ownerId のどちらか一方（§2.4） */
+  shareGroupId?: string | null;
+  ownerId?: string | null;
   payerId: string | null;
   createdBy: string;
   occurredOn: string;
@@ -146,6 +157,8 @@ export async function seedTransaction(input: {
     .from('transactions')
     .insert({
       category_id: input.categoryId,
+      share_group_id: input.shareGroupId ?? null,
+      owner_id: input.shareGroupId == null ? (input.ownerId ?? input.createdBy) : null,
       payer_id: input.payerId,
       created_by: input.createdBy,
       occurred_on: input.occurredOn,
@@ -163,10 +176,20 @@ export async function seedTransaction(input: {
   return id;
 }
 
-export async function seedBudget(categoryId: string, month: string, amount: number): Promise<void> {
-  const { error } = await adminClient()
-    .from('budgets')
-    .insert({ category_id: categoryId, month, amount });
+export async function seedBudget(input: {
+  categoryId: string;
+  shareGroupId?: string | null;
+  ownerId?: string | null;
+  month: string;
+  amount: number;
+}): Promise<void> {
+  const { error } = await adminClient().from('budgets').insert({
+    category_id: input.categoryId,
+    share_group_id: input.shareGroupId ?? null,
+    owner_id: input.shareGroupId == null ? (input.ownerId ?? null) : null,
+    month: input.month,
+    amount: input.amount,
+  });
   if (error !== null) throw error;
 }
 
@@ -179,12 +202,11 @@ export async function countBudgets(categoryId: string): Promise<number> {
   return count ?? 0;
 }
 
-/** 個人の未分類カテゴリ（収入・支出）の id。 */
-export async function systemCategoryOf(ownerId: string, kind: 'income' | 'expense'): Promise<string> {
+/** 未分類カテゴリの id。収支区分ごとに全体で1件（§3.4）。 */
+export async function systemCategoryOf(kind: 'income' | 'expense'): Promise<string> {
   const { data, error } = await adminClient()
     .from('categories')
     .select('id')
-    .eq('owner_id', ownerId)
     .eq('kind', kind)
     .eq('is_system', true)
     .single();
@@ -195,6 +217,8 @@ export async function systemCategoryOf(ownerId: string, kind: 'income' | 'expens
 /** 定期登録ルールを1件作る（§3.8）。created_by は既定値が入らないので必ず渡す。 */
 export async function seedRecurringRule(input: {
   categoryId: string;
+  shareGroupId?: string | null;
+  ownerId?: string | null;
   createdBy: string;
   payerId: string | null;
   amount: number;
@@ -211,6 +235,8 @@ export async function seedRecurringRule(input: {
     .from('recurring_rules')
     .insert({
       category_id: input.categoryId,
+      share_group_id: input.shareGroupId ?? null,
+      owner_id: input.shareGroupId == null ? (input.ownerId ?? input.createdBy) : null,
       created_by: input.createdBy,
       payer_id: input.payerId,
       amount: input.amount,

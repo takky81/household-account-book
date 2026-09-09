@@ -27,12 +27,11 @@ export type GroupMember = {
   sort_order: number;
 };
 
+/** 全ユーザー共通のカテゴリ（§3.4）。共有範囲は持たない（取引・予算・ルールの側にある） */
 export type Category = {
   id: string;
   /** 親カテゴリ。null なら大分類（§3.4.1） */
   parent_id: string | null;
-  share_group_id: string | null;
-  owner_id: string | null;
   kind: Kind;
   name: string;
   color: string;
@@ -41,7 +40,16 @@ export type Category = {
   is_archived: boolean;
 };
 
-export type Transaction = {
+/**
+ * 共有範囲。取引・予算・定期登録ルールが持つ（§2.4）。
+ * share_group_id が入っていれば共有、null なら個人で owner_id が入る。
+ */
+export type ScopeColumns = {
+  share_group_id: string | null;
+  owner_id: string | null;
+};
+
+export type Transaction = ScopeColumns & {
   id: string;
   category_id: string;
   payer_id: string | null;
@@ -53,10 +61,15 @@ export type Transaction = {
   transaction_splits: { user_id: string; amount: number }[];
 };
 
-export type Budget = { id: string; category_id: string; month: string; amount: number };
+export type Budget = ScopeColumns & {
+  id: string;
+  category_id: string;
+  month: string;
+  amount: number;
+};
 
 /** 定期登録ルール（§3.8）。負担の雛形は splits_are_manual のときだけ行を持つ */
-export type RecurringRule = {
+export type RecurringRule = ScopeColumns & {
   id: string;
   category_id: string;
   payer_id: string | null;
@@ -174,6 +187,9 @@ export async function loadRecurringPostings(): Promise<RecurringPosting[]> {
 export type SaveTransaction = {
   id?: string;
   categoryId: string;
+  /** 共有範囲。グループなら shareGroupId、個人なら ownerId のどちらか一方（§2.4） */
+  shareGroupId: string | null;
+  ownerId: string | null;
   occurredOn: string;
   amount: number;
   payerId: string | null;
@@ -189,6 +205,8 @@ export async function saveTransaction(input: SaveTransaction): Promise<string> {
     p_amount: input.amount,
     p_payer_id: input.payerId,
     p_memo: input.memo,
+    p_share_group_id: input.shareGroupId,
+    p_owner_id: input.ownerId,
     p_splits:
       input.splits === undefined
         ? null
@@ -207,6 +225,8 @@ export async function deleteTransaction(id: string): Promise<void> {
 export type SaveRecurringRule = {
   id?: string;
   categoryId: string;
+  shareGroupId: string | null;
+  ownerId: string | null;
   amount: number;
   dayOfMonth: number;
   /** 対象月（YYYY-MM）。RPC には月初の日付として渡す */
@@ -229,6 +249,8 @@ export async function saveRecurringRule(input: SaveRecurringRule): Promise<strin
     p_memo: input.memo,
     p_end_month: input.endMonth === null ? null : monthStart(input.endMonth),
     p_is_paused: input.isPaused,
+    p_share_group_id: input.shareGroupId,
+    p_owner_id: input.ownerId,
     p_splits:
       input.splits === undefined
         ? null
@@ -253,17 +275,15 @@ export async function runRecurringRules(): Promise<RecurringRunResult> {
 }
 
 export async function createCategory(input: {
-  shareGroupId: string | null;
   kind: Kind;
   name: string;
   color: string;
   sortOrder: number;
-  /** 小分類として作るときの親。共有範囲と収支区分は親からコピーされる（§3.4.1） */
+  /** 小分類として作るときの親。収支区分は親からコピーされる（§3.4.1） */
   parentId?: string | null;
 }): Promise<void> {
-  // owner_id / created_by / is_system は既定値とトリガが入れる（列を grant していない）
+  // created_by / is_system は既定値とトリガが入れる（列を grant していない）
   const { error } = await supabase.from('categories').insert({
-    share_group_id: input.shareGroupId,
     kind: input.kind,
     name: input.name,
     color: input.color,
@@ -286,25 +306,48 @@ export async function deleteCategory(id: string): Promise<void> {
   if (error !== null) throw new Error(error.message);
 }
 
-export async function moveCategoryScope(input: {
-  categoryId: string;
-  destShareGroupId: string | null;
-  destOwnerId: string | null;
-  merge: boolean;
-}): Promise<void> {
-  const { error } = await supabase.rpc('move_category_scope', {
-    p_category_id: input.categoryId,
-    p_dest_share_group_id: input.destShareGroupId,
-    p_dest_owner_id: input.destOwnerId,
-    p_merge: input.merge,
-  });
+/**
+ * カテゴリを使っている件数（§3.4）。改名・削除の前に画面が影響として見せる。
+ *
+ * 自分に見えない共有範囲の分も数えるため RPC（DEFINER）で数える。
+ * 返るのは件数だけで、他人の取引の中身は返らない。
+ */
+export type CategoryUsage = {
+  transactions: number;
+  others_transactions: number;
+  rules: number;
+  others_rules: number;
+  budgets: number;
+  others_budgets: number;
+  /** 自分以外の何人が使っているか */
+  others: number;
+};
+
+export async function loadCategoryUsage(categoryId: string): Promise<CategoryUsage> {
+  const { data, error } = await supabase.rpc('category_usage', { p_category_id: categoryId });
   if (error !== null) throw new Error(error.message);
+  return data as CategoryUsage;
 }
 
+/** 取引のカテゴリを付け替える。共有範囲は動かないので負担は保たれる（§2.8）。 */
 export async function moveTransactions(ids: string[], destCategoryId: string): Promise<void> {
   const { error } = await supabase.rpc('move_transactions', {
     p_transaction_ids: ids,
     p_dest_category_id: destCategoryId,
+  });
+  if (error !== null) throw new Error(error.message);
+}
+
+/** 取引の共有範囲を付け替える。範囲が変わる取引は負担が作り直される（§5.2）。 */
+export async function moveTransactionsScope(input: {
+  ids: string[];
+  destShareGroupId: string | null;
+  destOwnerId: string | null;
+}): Promise<void> {
+  const { error } = await supabase.rpc('move_transactions_scope', {
+    p_transaction_ids: input.ids,
+    p_dest_share_group_id: input.destShareGroupId,
+    p_dest_owner_id: input.destOwnerId,
   });
   if (error !== null) throw new Error(error.message);
 }
@@ -373,34 +416,50 @@ export async function updateMemberWeight(input: {
   if (error !== null) throw new Error(error.message);
 }
 
-export async function saveBudget(input: {
-  categoryId: string;
-  month: string;
-  amount: number;
-}): Promise<void> {
+/**
+ * 予算の共有範囲。同じカテゴリに共有の枠と個人の枠が並ぶため、
+ * カテゴリと対象月だけでは1行に決まらない（§3.7）。
+ */
+export type BudgetScope = { shareGroupId: string | null; ownerId: string | null };
+
+export async function saveBudget(
+  input: { categoryId: string; month: string; amount: number } & BudgetScope,
+): Promise<void> {
   // upsert（on conflict do update）は category_id と month の UPDATE 権限まで要求するが、
   // budgets に許しているのは amount の更新だけ。更新してから、無ければ入れる（§2.6）
-  const updated = await supabase
+  const query = supabase
     .from('budgets')
     .update({ amount: input.amount })
     .eq('category_id', input.categoryId)
-    .eq('month', input.month)
-    .select('id');
+    .eq('month', input.month);
+  const updated = await (input.shareGroupId !== null
+    ? query.eq('share_group_id', input.shareGroupId)
+    : query.eq('owner_id', input.ownerId ?? '')
+  ).select('id');
   if (updated.error !== null) throw new Error(updated.error.message);
   if ((updated.data ?? []).length > 0) return;
 
-  const inserted = await supabase
-    .from('budgets')
-    .insert({ category_id: input.categoryId, month: input.month, amount: input.amount });
+  const inserted = await supabase.from('budgets').insert({
+    category_id: input.categoryId,
+    share_group_id: input.shareGroupId,
+    owner_id: input.ownerId,
+    month: input.month,
+    amount: input.amount,
+  });
   if (inserted.error !== null) throw new Error(inserted.error.message);
 }
 
-export async function deleteBudget(categoryId: string, month: string): Promise<void> {
-  const { error } = await supabase
+export async function deleteBudget(
+  input: { categoryId: string; month: string } & BudgetScope,
+): Promise<void> {
+  const query = supabase
     .from('budgets')
     .delete()
-    .eq('category_id', categoryId)
-    .eq('month', month);
+    .eq('category_id', input.categoryId)
+    .eq('month', input.month);
+  const { error } = await (input.shareGroupId !== null
+    ? query.eq('share_group_id', input.shareGroupId)
+    : query.eq('owner_id', input.ownerId ?? ''));
   if (error !== null) throw new Error(error.message);
 }
 
@@ -415,6 +474,8 @@ export async function updateProfile(
 export async function importTransactions(
   rows: {
     categoryId: string;
+    shareGroupId: string | null;
+    ownerId: string | null;
     occurredOn: string;
     amount: number;
     payerId: string | null;
@@ -425,6 +486,8 @@ export async function importTransactions(
   const { data, error } = await supabase.rpc('import_transactions', {
     p_rows: rows.map((row) => ({
       category_id: row.categoryId,
+      share_group_id: row.shareGroupId,
+      owner_id: row.ownerId,
       occurred_on: row.occurredOn,
       amount: row.amount,
       payer_id: row.payerId,

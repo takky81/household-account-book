@@ -115,13 +115,7 @@ export function HomePage() {
           {budgetRows.map((row) => (
             <div key={row.categoryId} className="flex flex-col gap-1">
               <div className="flex items-center justify-between text-sm">
-                <span className="flex items-center gap-1">
-                  <ScopeTag
-                    label={workspace.scopeLabel({ share_group_id: row.shareGroupId })}
-                    kind={row.shareGroupId === null ? 'own' : 'group'}
-                  />
-                  {row.name}
-                </span>
+                <span className="flex items-center gap-1">{row.name}</span>
                 <span className={row.over ? 'text-[var(--c-warn)]' : ''}>
                   {formatAmount(row.actual)} / {formatAmount(row.budget ?? 0)}
                 </span>
@@ -142,9 +136,10 @@ export function HomePage() {
             return (
               <li key={tx.id} className="flex items-center justify-between text-sm">
                 <span className="flex items-center gap-1">
+                  {/* 共有範囲は取引が持つ（§2.4） */}
                   <ScopeTag
-                    label={workspace.scopeLabel(category)}
-                    kind={category.share_group_id === null ? 'own' : 'group'}
+                    label={workspace.scopeLabel(tx)}
+                    kind={tx.share_group_id === null ? 'own' : 'group'}
                   />
                   {workspace.categoryPath(category.id)}
                   <span className="text-xs text-[var(--c-muted)]">

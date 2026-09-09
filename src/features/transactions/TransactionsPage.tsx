@@ -11,6 +11,7 @@ import {
   deleteTransaction,
   loadMonthTransactions,
   moveTransactions,
+  moveTransactionsScope,
   type Transaction,
 } from '../../lib/db';
 import { useAuth, useWorkspace } from '../app/context';
@@ -31,6 +32,8 @@ export function TransactionsPage() {
   const [keyword, setKeyword] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
   const [destCategoryId, setDestCategoryId] = useState('');
+  /** まとめて付け替える先の共有範囲（§2.8） */
+  const [destScopeKey, setDestScopeKey] = useState('');
   const [error, setError] = useState('');
 
   const reload = useMemo(
@@ -41,11 +44,12 @@ export function TransactionsPage() {
     void reload();
   }, [reload]);
 
+  // 共有範囲は取引が持つ（§2.4）。カテゴリからは決まらない
   const visible = rows.filter((tx) => {
     const category = workspace.categories.find((c) => c.id === tx.category_id);
     if (category === undefined) return false;
-    if (scope === 'own' && category.share_group_id !== null) return false;
-    if (scope !== 'all' && scope !== 'own' && category.share_group_id !== scope) return false;
+    if (scope === 'own' && tx.share_group_id !== null) return false;
+    if (scope !== 'all' && scope !== 'own' && tx.share_group_id !== scope) return false;
     if (keyword !== '' && !`${category.name}${tx.memo}`.includes(keyword)) return false;
     return true;
   });
@@ -63,40 +67,55 @@ export function TransactionsPage() {
     await reload();
   }
 
+  /**
+   * カテゴリの付け替え。共有範囲は動かないので負担は保たれ、§5.2 の検査も要らない（§2.8）。
+   */
   async function move() {
     setError('');
-    const dest = workspace.categories.find((c) => c.id === destCategoryId);
+    if (destCategoryId === '' || selected.length === 0) return;
+    try {
+      await moveTransactions(selected, destCategoryId);
+      setSelected([]);
+      await reload();
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : '付け替えられませんでした');
+    }
+  }
+
+  /**
+   * 共有範囲の付け替え。範囲が変わる取引は負担が作り直されるので、
+   * 先に §5.2 の検査を画面でも行って件数と理由を出す。
+   */
+  async function moveScope() {
+    setError('');
+    const dest = workspace.scopes.find((s) => s.key === destScopeKey);
     if (dest === undefined || selected.length === 0) return;
     const picked = rows.filter((tx) => selected.includes(tx.id));
     const source = picked[0];
-    const sourceCategory =
-      source === undefined ? null : workspace.categories.find((c) => c.id === source.category_id);
     const check = checkMove({
       source: {
-        shareGroupId: sourceCategory?.share_group_id ?? null,
-        ownerId: sourceCategory?.owner_id ?? null,
+        shareGroupId: source?.share_group_id ?? null,
+        ownerId: source?.owner_id ?? null,
       },
-      dest: { shareGroupId: dest.share_group_id, ownerId: dest.owner_id },
-      kind: dest.kind,
-      name: dest.name,
-      categories: workspace.tree,
+      dest,
       transactions: toMoveTx(picked),
       destMemberIds:
-        dest.share_group_id === null
+        dest.shareGroupId === null
           ? [selfId]
-          : workspace.membersOf(dest.share_group_id).map((m) => m.userId),
+          : workspace.membersOf(dest.shareGroupId).map((m) => m.userId),
       selfId,
       myGroupIds: workspace.myGroupIds,
-      sourceCategoryId: sourceCategory?.id ?? '',
-      // 移動先は既存のカテゴリそのものなので、同名の検査はしない（§2.8）
-      skipNameCheck: true,
     });
     if (!check.ok) {
       setError(check.message);
       return;
     }
     try {
-      await moveTransactions(selected, destCategoryId);
+      await moveTransactionsScope({
+        ids: selected,
+        destShareGroupId: dest.shareGroupId,
+        destOwnerId: dest.ownerId,
+      });
       setSelected([]);
       await reload();
     } catch (failure) {
@@ -145,8 +164,8 @@ export function TransactionsPage() {
                     />
                     <span className="text-sm whitespace-nowrap">{formatDay(tx.occurred_on)}</span>
                     <ScopeTag
-                      label={workspace.scopeLabel(category)}
-                      kind={category.share_group_id === null ? 'own' : 'group'}
+                      label={workspace.scopeLabel(tx)}
+                      kind={tx.share_group_id === null ? 'own' : 'group'}
                     />
                     <span className="ml-auto text-base font-bold tabular-nums">
                       {formatAmount(tx.amount)}
@@ -210,8 +229,8 @@ export function TransactionsPage() {
                     <td className="p-2 whitespace-nowrap">{formatDay(tx.occurred_on)}</td>
                     <td className="p-2">
                       <ScopeTag
-                        label={workspace.scopeLabel(category)}
-                        kind={category.share_group_id === null ? 'own' : 'group'}
+                        label={workspace.scopeLabel(tx)}
+                        kind={tx.share_group_id === null ? 'own' : 'group'}
                       />
                     </td>
                     <td className="p-2">{workspace.categoryPath(category.id)}</td>
@@ -252,12 +271,26 @@ export function TransactionsPage() {
             <option value="">選んでください</option>
             {selectableCategories(workspace.tree).map((c) => (
               <option key={c.id} value={c.id}>
-                {workspace.scopeLabel({ share_group_id: c.shareGroupId })} /{' '}
                 {workspace.categoryPath(c.id)}
               </option>
             ))}
           </select>
           <Button onClick={() => void move()}>カテゴリを付け替える</Button>
+
+          <select
+            aria-label="付け替え先の共有範囲"
+            className="rounded-md border border-[var(--c-edge)] bg-[var(--c-panel)] px-2 py-1 text-sm"
+            value={destScopeKey}
+            onChange={(e) => setDestScopeKey(e.target.value)}
+          >
+            <option value="">選んでください</option>
+            {workspace.scopes.map((s) => (
+              <option key={s.key} value={s.key}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+          <Button onClick={() => void moveScope()}>共有範囲を付け替える</Button>
         </Card>
       )}
 

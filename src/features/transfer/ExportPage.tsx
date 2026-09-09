@@ -52,8 +52,6 @@ export function ExportPage() {
         workspace.categories.map((c) => ({
           id: c.id,
           parentId: c.parent_id,
-          shareGroupId: c.share_group_id,
-          ownerId: c.owner_id,
           kind: c.kind,
           name: c.name,
           isArchived: c.is_archived,
@@ -61,7 +59,6 @@ export function ExportPage() {
           sortOrder: c.sort_order,
           isSystem: c.is_system,
         })),
-        groupNames,
       );
       downloadCsv('カテゴリ.csv', text);
       return;
@@ -69,12 +66,15 @@ export function ExportPage() {
     if (target === 'budgets') {
       const budgets = await loadBudgets(month === null ? allMonths() : [month]);
       const text = budgetCsv(
-        budgets.map((b) => ({ categoryId: b.category_id, month: b.month, amount: b.amount })),
+        budgets.map((b) => ({
+          categoryId: b.category_id,
+          shareGroupId: b.share_group_id,
+          month: b.month,
+          amount: b.amount,
+        })),
         workspace.categories.map((c) => ({
           id: c.id,
           parentId: c.parent_id,
-          shareGroupId: c.share_group_id,
-          ownerId: c.owner_id,
           kind: c.kind,
           name: c.name,
           isArchived: c.is_archived,

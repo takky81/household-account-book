@@ -2,20 +2,18 @@
  * カテゴリの階層（docs/仕様書.md §3.4.1）。決定表「カテゴリの管理」列15〜列24 に対応する。
  *
  * 階層は2段まで。親を持たないものが大分類、その下に置くものが小分類で、
- * 小分類の共有範囲・収支区分は親と同じ（DB のトリガが親からコピーする）。
+ * 小分類の収支区分は親と同じ（DB のトリガが親からコピーする）。
+ * カテゴリは全ユーザー共通で、共有範囲は持たない（§2.4）。
  * ここは画面が並べ替え・候補・表示名を決めるための判定。
  */
 
 import type { Kind } from './name';
-import { scopeKey } from './name';
 
 export type TreeCategory = {
   id: string;
   parentId: string | null;
   name: string;
   kind: Kind;
-  shareGroupId: string | null;
-  ownerId: string | null;
   sortOrder: number;
   isSystem: boolean;
   isArchived: boolean;
@@ -55,23 +53,16 @@ function groupByParent<T extends TreeCategory>(categories: T[]): Map<string, T[]
 }
 
 /** 兄弟を決めるのに要るものだけ。まだ作っていないカテゴリにも使える（列15） */
-export type SiblingKey = Pick<TreeCategory, 'parentId' | 'kind' | 'shareGroupId' | 'ownerId'>;
+export type SiblingKey = Pick<TreeCategory, 'parentId' | 'kind'>;
 
 /**
  * 並べ替えの単位（列14・列23）。小分類なら同じ親の小分類、大分類なら
- * 同じ共有範囲・同じ収支区分の大分類。未分類は常に末尾なので対象にしない。
+ * 同じ収支区分の大分類。未分類は常に末尾なので対象にしない。
  */
 export function siblingsOf<T extends TreeCategory>(categories: T[], target: SiblingKey): T[] {
   if (target.parentId !== null) return childrenOf(categories, target.parentId);
-  const key = scopeKey(target.shareGroupId, target.ownerId);
   return categories
-    .filter(
-      (c) =>
-        c.parentId === null &&
-        !c.isSystem &&
-        c.kind === target.kind &&
-        scopeKey(c.shareGroupId, c.ownerId) === key,
-    )
+    .filter((c) => c.parentId === null && !c.isSystem && c.kind === target.kind)
     .sort(byOrder);
 }
 

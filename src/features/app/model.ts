@@ -17,8 +17,6 @@ export function toTreeCategory(category: Category): TreeCategory {
     parentId: category.parent_id,
     name: category.name,
     kind: category.kind,
-    shareGroupId: category.share_group_id,
-    ownerId: category.owner_id,
     sortOrder: category.sort_order,
     isSystem: category.is_system,
     isArchived: category.is_archived,
@@ -40,8 +38,9 @@ export function toAggregateTx(transactions: Transaction[], categories: Category[
         parentName:
           category.parent_id === null ? null : (byId.get(category.parent_id)?.name ?? null),
         kind: category.kind,
-        shareGroupId: category.share_group_id,
-        ownerId: category.owner_id,
+        // 共有範囲は取引が持つ（§2.4）。カテゴリからはもう決まらない
+        shareGroupId: tx.share_group_id,
+        ownerId: tx.owner_id,
         amount: tx.amount,
         payerId: tx.payer_id,
         splits: tx.transaction_splits.map((s) => ({ userId: s.user_id, amount: s.amount })),
@@ -59,8 +58,8 @@ export function toExportTx(transactions: Transaction[], categories: Category[]):
       {
         occurredOn: tx.occurred_on,
         kind: category.kind,
-        shareGroupId: category.share_group_id,
-        ownerId: category.owner_id,
+        shareGroupId: tx.share_group_id,
+        ownerId: tx.owner_id,
         // CSV は「カテゴリ」に大分類、「小分類」にその名前を書く（§4.2）
         categoryName:
           category.parent_id === null

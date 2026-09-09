@@ -55,11 +55,10 @@ export function ImportPage() {
       const seen = new Set<string>();
       for (const category of toCreate) {
         // 親が違えば同じ名前でも別のカテゴリ（§3.4.1）
-        const key = `${category.shareGroupId ?? ''}:${category.kind}:${category.parentId ?? ''}:${category.name}`;
+        const key = `${category.kind}:${category.parentId ?? ''}:${category.name}`;
         if (seen.has(key)) continue;
         seen.add(key);
         await createCategory({
-          shareGroupId: category.shareGroupId,
           kind: category.kind,
           name: category.name,
           color: '#4a6fa5',
@@ -79,6 +78,8 @@ export function ImportPage() {
           ? [
               {
                 categoryId: entry.payload.categoryId,
+                shareGroupId: entry.payload.shareGroupId,
+                ownerId: entry.payload.ownerId,
                 occurredOn: entry.payload.occurredOn,
                 amount: entry.payload.amount,
                 payerId: entry.payload.payerId,

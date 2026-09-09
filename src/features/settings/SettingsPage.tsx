@@ -130,7 +130,7 @@ export function SettingsPage() {
               .filter((c) => !c.is_archived)
               .map((c) => (
                 <option key={c.id} value={c.id}>
-                  {workspace.scopeLabel(c)} / {c.name}
+                  {workspace.categoryPath(c.id)}
                 </option>
               ))}
           </Select>

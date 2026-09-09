@@ -95,10 +95,13 @@ export type ExportCategory = CategoryLike & {
 
 const yesNo = (value: boolean) => (value ? 'はい' : 'いいえ');
 
-export function categoryCsv(categories: ExportCategory[], groupNames: Names): string {
+/**
+ * カテゴリ CSV（§4.3）。カテゴリは全ユーザー共通になったので共有範囲の列を持たない。
+ * 共有範囲は取引 CSV と予算 CSV の側に残る。
+ */
+export function categoryCsv(categories: ExportCategory[]): string {
   // 小分類の行は「カテゴリ」に親の名前を書く（§4.3）
   const row = (category: ExportCategory, parentName: string | null) => [
-    scopeLabel(category.shareGroupId, groupNames),
     kindLabel(category.kind),
     parentName ?? category.name,
     parentName === null ? '' : category.name,
@@ -108,7 +111,7 @@ export function categoryCsv(categories: ExportCategory[], groupNames: Names): st
     yesNo(category.isArchived),
   ];
   return toCsv(
-    ['共有範囲', '収支', 'カテゴリ', '小分類', '色', '表示順', '未分類', 'アーカイブ済み'],
+    ['収支', 'カテゴリ', '小分類', '色', '表示順', '未分類', 'アーカイブ済み'],
     // 親の行を先に、続けてその小分類を並べる。並びは画面と同じ規則（§3.4）
     orderedTree(categories).flatMap(({ root, children }) => [
       row(root, null),
@@ -117,8 +120,14 @@ export function categoryCsv(categories: ExportCategory[], groupNames: Names): st
   );
 }
 
+/** 予算 CSV（§4.3）。共有範囲は予算そのものが持つ（§3.7） */
 export function budgetCsv(
-  budgets: { categoryId: string; month: string; amount: number }[],
+  budgets: {
+    categoryId: string;
+    shareGroupId: string | null;
+    month: string;
+    amount: number;
+  }[],
   categories: CategoryLike[],
   groupNames: Names,
 ): string {
@@ -130,7 +139,7 @@ export function budgetCsv(
       if (category === undefined) return [];
       return [
         [
-          scopeLabel(category.shareGroupId, groupNames),
+          scopeLabel(b.shareGroupId, groupNames),
           kindLabel(category.kind),
           category.name,
           // 対象月は日付ではないので YYYY-MM で書く（§4.3）

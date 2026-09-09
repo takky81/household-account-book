@@ -12,10 +12,11 @@ function thisMonth(): string {
 
 test.describe('予算', () => {
   test('列1 予算の消化状況が出る', async ({ signedIn, users }) => {
-    const category = await seedCategory({ ownerId: users.taro, name: '食費' });
-    await seedBudget(category, thisMonth(), 10000);
+    const category = await seedCategory({ name: '食費' });
+    await seedBudget({ categoryId: category, ownerId: users.taro, month: thisMonth(), amount: 10000 });
     await seedTransaction({
       categoryId: category,
+      ownerId: users.taro,
       payerId: users.taro,
       createdBy: users.taro,
       occurredOn: today(),
@@ -30,10 +31,11 @@ test.describe('予算', () => {
   });
 
   test('列2 予算を超えると超過として出る', async ({ signedIn, users }) => {
-    const category = await seedCategory({ ownerId: users.taro, name: '食費' });
-    await seedBudget(category, thisMonth(), 1000);
+    const category = await seedCategory({ name: '食費' });
+    await seedBudget({ categoryId: category, ownerId: users.taro, month: thisMonth(), amount: 1000 });
     await seedTransaction({
       categoryId: category,
+      ownerId: users.taro,
       payerId: users.taro,
       createdBy: users.taro,
       occurredOn: today(),
@@ -46,8 +48,8 @@ test.describe('予算', () => {
     await expect(row).toContainText('-2,000');
   });
 
-  test('列5 収入カテゴリに予算は置けない', async ({ signedIn, users }) => {
-    const category = await seedCategory({ ownerId: users.taro, name: '給与', kind: 'income' });
+  test('列5 収入カテゴリに予算は置けない', async ({ signedIn }) => {
+    const category = await seedCategory({ name: '給与', kind: 'income' });
 
     await signedIn.goto('/budget');
     // 予算の表には支出カテゴリしか出ない
@@ -62,8 +64,8 @@ test.describe('予算', () => {
   });
 
   test('列7 同じ月に入れ直すと上書きになる', async ({ signedIn, users }) => {
-    const category = await seedCategory({ ownerId: users.taro, name: '食費' });
-    await seedBudget(category, thisMonth(), 10000);
+    const category = await seedCategory({ name: '食費' });
+    await seedBudget({ categoryId: category, ownerId: users.taro, month: thisMonth(), amount: 10000 });
 
     await signedIn.goto('/budget');
     // 読み込みが終わってから触る。終わる前に入れると読み込みが上書きしてしまう
@@ -85,8 +87,8 @@ test.describe('予算', () => {
   });
 
   test('読み込みが終わるまで予算の入力欄を出さない', async ({ signedIn, users }) => {
-    const category = await seedCategory({ ownerId: users.taro, name: '食費' });
-    await seedBudget(category, thisMonth(), 10000);
+    const category = await seedCategory({ name: '食費' });
+    await seedBudget({ categoryId: category, ownerId: users.taro, month: thisMonth(), amount: 10000 });
 
     // 予算の取得を止めておく。空の入力欄を先に出すと、値が届いた時点で入力欄が
     // 作り直され、その間に打ち込んだ内容が黙って消える
@@ -108,10 +110,10 @@ test.describe('予算', () => {
   });
 
   test('列9 前月の予算を複製できる', async ({ signedIn, users }) => {
-    const category = await seedCategory({ ownerId: users.taro, name: '食費' });
+    const category = await seedCategory({ name: '食費' });
     const previous = new Date(`${thisMonth()}T00:00:00Z`);
     previous.setUTCMonth(previous.getUTCMonth() - 1);
-    await seedBudget(category, previous.toISOString().slice(0, 10), 8000);
+    await seedBudget({ categoryId: category, ownerId: users.taro, month: previous.toISOString().slice(0, 10), amount: 8000 });
 
     await signedIn.goto('/budget');
     await expect(signedIn.getByLabel('食費の予算')).toHaveValue('');
@@ -122,8 +124,8 @@ test.describe('予算', () => {
   });
 
   test('列10 カテゴリを消すと予算も消える', async ({ signedIn, users }) => {
-    const category = await seedCategory({ ownerId: users.taro, name: '食費' });
-    await seedBudget(category, thisMonth(), 10000);
+    const category = await seedCategory({ name: '食費' });
+    await seedBudget({ categoryId: category, ownerId: users.taro, month: thisMonth(), amount: 10000 });
 
     await signedIn.goto('/categories');
     await signedIn.getByRole('button', { name: '削除' }).click();
@@ -137,9 +139,9 @@ test.describe('予算', () => {
     expect(count).toBe(0);
   });
   test('列12・列13 予算は大分類に置き、実績は小分類を含む', async ({ signedIn, users }) => {
-    const parent = await seedCategory({ ownerId: users.taro, name: '食費' });
-    const child = await seedCategory({ ownerId: users.taro, name: '外食', parentId: parent });
-    await seedBudget(parent, thisMonth(), 10000);
+    const parent = await seedCategory({ name: '食費' });
+    const child = await seedCategory({ name: '外食', parentId: parent });
+    await seedBudget({ categoryId: parent, ownerId: users.taro, month: thisMonth(), amount: 10000 });
     for (const [categoryId, amount] of [
       [parent, 2000],
       [child, 3000],

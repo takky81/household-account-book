@@ -22,11 +22,11 @@ test.describe('表示設定と共通の振る舞い', () => {
     await expect(signedIn.getByTestId('nav-bottom')).toHaveCount(0);
   });
 
-  test('列4 保存を続けて押しても取引は1件しかできない', async ({ signedIn, users }) => {
-    await seedCategory({ ownerId: users.taro, name: '食費' });
+  test('列4 保存を続けて押しても取引は1件しかできない', async ({ signedIn }) => {
+    await seedCategory({ name: '食費' });
 
     await signedIn.goto('/new');
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '個人 / 食費' });
+    await signedIn.getByLabel('カテゴリ').selectOption({ label: '食費' });
     await signedIn.getByLabel('金額').fill('780');
 
     const save = signedIn.getByRole('button', { name: '保存', exact: true });
@@ -49,11 +49,11 @@ test.describe('表示設定と共通の振る舞い', () => {
     // 中身が index.html と一致することは CI のビルド後に確かめている（.github/workflows/ci.yml）
   });
 
-  test('列6 通信に失敗しても入力は消えない', async ({ signedIn, users }) => {
-    await seedCategory({ ownerId: users.taro, name: '食費' });
+  test('列6 通信に失敗しても入力は消えない', async ({ signedIn }) => {
+    await seedCategory({ name: '食費' });
 
     await signedIn.goto('/new');
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '個人 / 食費' });
+    await signedIn.getByLabel('カテゴリ').selectOption({ label: '食費' });
     await signedIn.getByLabel('金額').fill('780');
     await signedIn.getByLabel('備考').fill('昼食');
 
@@ -75,10 +75,11 @@ test.describe('表示設定と共通の振る舞い', () => {
   });
 
   test('列8 狭い画面の取引一覧はカードで並ぶ', async ({ signedIn, users }) => {
-    const category = await seedCategory({ ownerId: users.taro, name: '食費' });
+    const category = await seedCategory({ name: '食費' });
     const occurredOn = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' });
     await seedTransaction({
       categoryId: category,
+      ownerId: users.taro,
       payerId: users.taro,
       createdBy: users.taro,
       occurredOn,

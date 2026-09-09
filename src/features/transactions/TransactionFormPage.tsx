@@ -1,13 +1,14 @@
 /**
  * 取引の入力と編集（決定表「取引の入力と編集」）。
  *
- * カテゴリを選ぶと共有範囲が決まり、負担の既定按分もそれで決まる。
+ * 共有範囲は取引が持つ（§2.4）。カテゴリは全ユーザー共通で、共有範囲を決めない。
+ * 共有範囲を選ぶと負担の既定按分が決まる。既定は「個人」。
  * 手で直した負担はそのまま保存し、以後は自動で戻さない。
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Button, Card, ErrorText, Field, ScopeTag, Tabs, TextInput } from '../../components/ui';
+import { Button, Card, ErrorText, Field, FieldGroup, Tabs, TextInput } from '../../components/ui';
 import {
   evaluateExpression,
   formatAmount,
@@ -20,7 +21,7 @@ import { saveTransaction, type Transaction } from '../../lib/db';
 import { supabase } from '../../lib/supabase';
 import { useAuth, useWorkspace } from '../app/context';
 import { validateTransaction } from './validation';
-import type { Kind } from '../categories/name';
+import { scopeKey, type Kind } from '../categories/name';
 import { selectableCategories } from '../categories/tree';
 
 const SHARED = '__shared__';
@@ -45,6 +46,8 @@ export function TransactionFormPage() {
   const [kind, setKind] = useState<Kind>('expense');
   const [occurredOn, setOccurredOn] = useState(todayIso());
   const [categoryId, setCategoryId] = useState('');
+  /** 共有範囲。既定は先頭＝個人（§2.4） */
+  const [scopeKeyValue, setScopeKeyValue] = useState(workspace.scopes[0]?.key ?? '');
   const [amountText, setAmountText] = useState('');
   const [payer, setPayer] = useState<string>(selfId);
   const [manualSplits, setManualSplits] = useState<Split[] | null>(null);
@@ -58,10 +61,11 @@ export function TransactionFormPage() {
   const amountRef = useRef<HTMLInputElement>(null);
 
   const category = workspace.categories.find((c) => c.id === categoryId) ?? null;
-  const isPersonal = category !== null && category.share_group_id === null;
+  const scope = workspace.scopes.find((s) => s.key === scopeKeyValue) ?? workspace.scopes[0] ?? null;
+  const isPersonal = scope !== null && scope.shareGroupId === null;
   const members = useMemo(
-    () => (category?.share_group_id != null ? workspace.membersOf(category.share_group_id) : []),
-    [category?.share_group_id, workspace],
+    () => (scope?.shareGroupId != null ? workspace.membersOf(scope.shareGroupId) : []),
+    [scope?.shareGroupId, workspace],
   );
   const memberIds = isPersonal ? [selfId] : members.map((m) => m.userId);
   const amount = parseAmountInput(amountText) ?? 0;
@@ -70,7 +74,7 @@ export function TransactionFormPage() {
   // 既定の負担。カテゴリ・金額・支払者が変わるたびに引き直す（§5.1）
   const autoSplits = useMemo(
     () =>
-      category === null || amount <= 0
+      category === null || scope === null || amount <= 0
         ? []
         : defaultSplits({
             members: members.map((m) => ({
@@ -81,9 +85,9 @@ export function TransactionFormPage() {
             amount,
             kind: category.kind,
             payerId,
-            ownerId: isPersonal ? category.owner_id : null,
+            ownerId: isPersonal ? scope.ownerId : null,
           }),
-    [category, amount, members, payerId, isPersonal],
+    [category, scope, amount, members, payerId, isPersonal],
   );
   const splits = manualSplits ?? autoSplits;
 
@@ -110,6 +114,7 @@ export function TransactionFormPage() {
       const found = workspace.categories.find((c) => c.id === tx.category_id);
       setKind(found?.kind ?? 'expense');
       setCategoryId(tx.category_id);
+      setScopeKeyValue(scopeKey(tx.share_group_id, tx.owner_id));
       setOccurredOn(tx.occurred_on);
       setAmountText(String(tx.amount));
       setPayer(tx.payer_id ?? SHARED);
@@ -119,7 +124,7 @@ export function TransactionFormPage() {
         // 読み込んだ順は決まらないので、既定の按分と同じ並び（メンバーの順、
         // 脱退した人は後ろ）に直す。そうしないと開くたびに行が入れ替わる
         const order = new Map(
-          (found?.share_group_id != null ? workspace.membersOf(found.share_group_id) : []).map(
+          (tx.share_group_id !== null ? workspace.membersOf(tx.share_group_id) : []).map(
             (m, index) => [m.userId, index],
           ),
         );
@@ -133,7 +138,7 @@ export function TransactionFormPage() {
     })();
   }, [id, workspace.categories]);
 
-  // 個人カテゴリの支払者は本人だけ（列4）
+  // 個人の共有範囲の支払者は本人だけ（列4）
   useEffect(() => {
     if (isPersonal && payer !== selfId) setPayer(selfId);
   }, [isPersonal, payer, selfId]);
@@ -178,10 +183,14 @@ export function TransactionFormPage() {
       );
       return;
     }
+    if (scope === null) {
+      setError('共有範囲を選んでください');
+      return;
+    }
     const check = validateTransaction({
       amount: parsed,
       isPersonal,
-      ownerId: category.owner_id,
+      ownerId: scope.ownerId,
       payerId,
       memberIds,
       splits,
@@ -197,6 +206,8 @@ export function TransactionFormPage() {
       await saveTransaction({
         id,
         categoryId: category.id,
+        shareGroupId: scope.shareGroupId,
+        ownerId: scope.ownerId,
         occurredOn,
         amount: parsed,
         payerId,
@@ -251,6 +262,19 @@ export function TransactionFormPage() {
         </div>
       </Field>
 
+      {/* 共有範囲はカテゴリと別に選ぶ。既定は個人（§2.4） */}
+      <FieldGroup label="共有範囲">
+        <Tabs
+          label="共有範囲"
+          value={scopeKeyValue}
+          onChange={(next) => {
+            setScopeKeyValue(next);
+            setManualSplits(null);
+          }}
+          options={workspace.scopes.map((s) => ({ value: s.key, label: s.label }))}
+        />
+      </FieldGroup>
+
       <Field label="カテゴリ">
         <select
           aria-label="カテゴリ"
@@ -264,22 +288,11 @@ export function TransactionFormPage() {
           <option value="">選んでください</option>
           {categoriesOfKind.map((c) => (
             <option key={c.id} value={c.id}>
-              {workspace.scopeLabel({ share_group_id: c.shareGroupId })} /{' '}
               {workspace.categoryPath(c.id)}
             </option>
           ))}
         </select>
       </Field>
-
-      {category !== null && (
-        <div className="flex items-center gap-2 text-xs">
-          <ScopeTag
-            label={workspace.scopeLabel(category)}
-            kind={category.share_group_id === null ? 'own' : 'group'}
-          />
-          <span className="text-[var(--c-muted)]">共有範囲はカテゴリが決める</span>
-        </div>
-      )}
 
       <Field label="金額" hint={amountHint}>
         <TextInput
@@ -311,7 +324,7 @@ export function TransactionFormPage() {
       </div>
 
       {!isPersonal && members.length > 0 && (
-        <Field label="支払者">
+        <FieldGroup label="支払者">
           <Tabs
             label="支払者"
             value={payer}
@@ -327,10 +340,10 @@ export function TransactionFormPage() {
               { value: SHARED, label: '共用' },
             ]}
           />
-        </Field>
+        </FieldGroup>
       )}
 
-      {/* 個人カテゴリの負担は本人1行＝全額に決まり、他の値は保存できない（§3.6）ので出さない */}
+      {/* 個人の負担は本人1行＝全額に決まり、他の値は保存できない（§3.6）ので出さない */}
       {!isPersonal && splits.length > 0 && (
         <Card>
           <div className="mb-2 flex items-center justify-between">

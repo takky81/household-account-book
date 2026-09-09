@@ -5,6 +5,7 @@ import {
   countTransactions,
   deleteTransactionsOf,
   seedCategory,
+  seedForeignGroup,
   seedGroup,
   seedRecurringRule,
 } from './db';
@@ -24,9 +25,10 @@ function monthKey(diff = 0): string {
 test.describe('定期登録', () => {
   test('列1 起動時に今月の家賃が登録される', async ({ page, users }) => {
     const group = await seedGroup(users);
-    const category = await seedCategory({ shareGroupId: group, name: '家賃' });
+    const category = await seedCategory({ name: '家賃' });
     await seedRecurringRule({
       categoryId: category,
+      shareGroupId: group,
       createdBy: users.taro,
       payerId: users.taro,
       amount: 120000,
@@ -45,9 +47,10 @@ test.describe('定期登録', () => {
 
   test('列9 数ヶ月開かなくても遡って登録される', async ({ page, users }) => {
     const group = await seedGroup(users);
-    const category = await seedCategory({ shareGroupId: group, name: '家賃' });
+    const category = await seedCategory({ name: '家賃' });
     await seedRecurringRule({
       categoryId: category,
+      shareGroupId: group,
       createdBy: users.taro,
       payerId: users.taro,
       amount: 120000,
@@ -62,9 +65,10 @@ test.describe('定期登録', () => {
   });
 
   test('列3 二度開いても取引は1件のまま', async ({ page, users }) => {
-    const category = await seedCategory({ ownerId: users.taro, name: 'サブスク' });
+    const category = await seedCategory({ name: 'サブスク' });
     await seedRecurringRule({
       categoryId: category,
+      ownerId: users.taro,
       createdBy: users.taro,
       payerId: users.taro,
       amount: 980,
@@ -83,9 +87,10 @@ test.describe('定期登録', () => {
   });
 
   test('列4 消した生成分は復活しない', async ({ page, users }) => {
-    const category = await seedCategory({ ownerId: users.taro, name: 'サブスク' });
+    const category = await seedCategory({ name: 'サブスク' });
     const rule = await seedRecurringRule({
       categoryId: category,
+      ownerId: users.taro,
       createdBy: users.taro,
       payerId: users.taro,
       amount: 980,
@@ -106,9 +111,10 @@ test.describe('定期登録', () => {
   });
 
   test('列12 アーカイブ済みカテゴリのルールは警告になる', async ({ page, users }) => {
-    const category = await seedCategory({ ownerId: users.taro, name: '旧サブスク' });
+    const category = await seedCategory({ name: '旧サブスク' });
     await seedRecurringRule({
       categoryId: category,
+      ownerId: users.taro,
       createdBy: users.taro,
       payerId: users.taro,
       amount: 500,
@@ -132,9 +138,10 @@ test.describe('定期登録', () => {
     // 画面が出た時点で起動時の実行は終わっている（終わるまで画面を出さない）
     await expect(run).toBeVisible();
 
-    const category = await seedCategory({ ownerId: users.taro, name: '保険' });
+    const category = await seedCategory({ name: '保険' });
     await seedRecurringRule({
       categoryId: category,
+      ownerId: users.taro,
       createdBy: users.taro,
       payerId: users.taro,
       amount: 3000,
@@ -150,12 +157,15 @@ test.describe('定期登録', () => {
   });
 
   test('列1 家賃のルールを登録できる', async ({ signedIn, users }) => {
-    const group = await seedGroup(users);
-    await seedCategory({ shareGroupId: group, name: '家賃' });
+    await seedGroup(users);
+    await seedCategory({ name: '家賃' });
 
     await signedIn.goto('/recurring');
     await signedIn.getByRole('button', { name: '＋ ルールを追加' }).click();
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '夫婦 / 家賃' });
+    await signedIn.getByRole('group', { name: '共有範囲' })
+      .getByRole('button', { name: '夫婦' })
+      .click();
+    await signedIn.getByLabel('カテゴリ').selectOption({ label: '家賃' });
     await signedIn.getByLabel('金額').fill('120000');
     await signedIn.getByLabel('支払日').fill('27');
     await signedIn.getByLabel('備考').fill('家賃');
@@ -168,12 +178,15 @@ test.describe('定期登録', () => {
   });
 
   test('列2 負担を手で決めたルールを登録できる', async ({ signedIn, users }) => {
-    const group = await seedGroup(users);
-    await seedCategory({ shareGroupId: group, name: '家賃' });
+    await seedGroup(users);
+    await seedCategory({ name: '家賃' });
 
     await signedIn.goto('/recurring');
     await signedIn.getByRole('button', { name: '＋ ルールを追加' }).click();
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '夫婦 / 家賃' });
+    await signedIn.getByRole('group', { name: '共有範囲' })
+      .getByRole('button', { name: '夫婦' })
+      .click();
+    await signedIn.getByLabel('カテゴリ').selectOption({ label: '家賃' });
     await signedIn.getByLabel('金額').fill('100000');
     await signedIn.getByLabel('taroの負担').fill('70000');
     await signedIn.getByLabel('hanaの負担').fill('30000');
@@ -187,12 +200,15 @@ test.describe('定期登録', () => {
   });
 
   test('列3 負担の合計が合わないと保存できない', async ({ signedIn, users }) => {
-    const group = await seedGroup(users);
-    await seedCategory({ shareGroupId: group, name: '家賃' });
+    await seedGroup(users);
+    await seedCategory({ name: '家賃' });
 
     await signedIn.goto('/recurring');
     await signedIn.getByRole('button', { name: '＋ ルールを追加' }).click();
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '夫婦 / 家賃' });
+    await signedIn.getByRole('group', { name: '共有範囲' })
+      .getByRole('button', { name: '夫婦' })
+      .click();
+    await signedIn.getByLabel('カテゴリ').selectOption({ label: '家賃' });
     await signedIn.getByLabel('金額').fill('100000');
     await signedIn.getByLabel('taroの負担').fill('70000');
     await signedIn.getByLabel('hanaの負担').fill('20000');
@@ -202,22 +218,27 @@ test.describe('定期登録', () => {
     await expect(signedIn.getByTestId('rule')).toHaveCount(0);
   });
 
-  test('列7 参照できないカテゴリには作れない', async ({ signedIn, users }) => {
-    await seedCategory({ ownerId: users.taro, name: '自分の光熱費' });
-    await seedCategory({ ownerId: users.other, name: '他人の光熱費' });
+  test('列7 参照できない共有範囲は選べない', async ({ signedIn, users }) => {
+    // カテゴリは全員共通なので、隠れるのは共有範囲の方（§2.4）
+    await seedCategory({ name: '光熱費' });
+    await seedGroup(users, '夫婦');
+    await seedForeignGroup('他人だけのグループ', users.hana);
 
     await signedIn.goto('/recurring');
     await signedIn.getByRole('button', { name: '＋ ルールを追加' }).click();
 
-    const options = signedIn.getByLabel('カテゴリ').locator('option');
-    await expect(options.filter({ hasText: '自分の光熱費' })).toHaveCount(1);
-    await expect(options.filter({ hasText: '他人の光熱費' })).toHaveCount(0);
+    await expect(signedIn.getByLabel('カテゴリ').locator('option').filter({ hasText: '光熱費' })).toHaveCount(1);
+    const scopes = signedIn.getByRole('group', { name: '共有範囲' });
+    await expect(scopes.getByRole('button', { name: '個人' })).toHaveCount(1);
+    await expect(scopes.getByRole('button', { name: '夫婦' })).toHaveCount(1);
+    await expect(scopes.getByRole('button', { name: '他人だけのグループ' })).toHaveCount(0);
   });
 
   test('列10 一時停止したルールは生成されない', async ({ page, users }) => {
-    const category = await seedCategory({ ownerId: users.taro, name: 'サブスク' });
+    const category = await seedCategory({ name: 'サブスク' });
     await seedRecurringRule({
       categoryId: category,
+      ownerId: users.taro,
       createdBy: users.taro,
       payerId: users.taro,
       amount: 980,

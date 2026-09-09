@@ -1,6 +1,13 @@
 import { test, expect } from './fixtures';
 import { adminClient, seedCategory, seedGroup, seedTransaction } from './db';
 
+/**
+ * 共有範囲の変更（決定表「共有範囲の変更」）。
+ *
+ * カテゴリは全ユーザー共通で共有範囲を持たないので、動かすのは取引の側。
+ * 経路は「1件を編集して変える」と「一覧でまとめて変える」の2つ（§2.8）。
+ */
+
 async function splitsOf(transactionId: string): Promise<{ user_id: string; amount: number }[]> {
   const { data, error } = await adminClient()
     .from('transaction_splits')
@@ -10,13 +17,29 @@ async function splitsOf(transactionId: string): Promise<{ user_id: string; amoun
   return data as { user_id: string; amount: number }[];
 }
 
+async function scopeOf(transactionId: string): Promise<string | null> {
+  const { data, error } = await adminClient()
+    .from('transactions')
+    .select('share_group_id')
+    .eq('id', transactionId)
+    .single();
+  if (error !== null) throw error;
+  return (data as { share_group_id: string | null }).share_group_id;
+}
+
+/** 一覧の初期表示は今月なので、今日の日付で入れる */
+function today(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' });
+}
+
 test.describe('共有範囲の変更', () => {
   test('列12 1件だけならその場で別の共有範囲へ付け替えられる', async ({ signedIn, users }) => {
     const group = await seedGroup(users);
-    const own = await seedCategory({ ownerId: users.taro, name: '食費' });
-    await seedCategory({ shareGroupId: group, name: '外食' });
+    const own = await seedCategory({ name: '食費' });
+    await seedCategory({ name: '外食' });
     const id = await seedTransaction({
       categoryId: own,
+      ownerId: users.taro,
       payerId: users.taro,
       createdBy: users.taro,
       occurredOn: '2026-09-01',
@@ -27,7 +50,11 @@ test.describe('共有範囲の変更', () => {
 
     await signedIn.goto(`/transactions/${id}/edit`);
     await expect(signedIn.getByLabel('備考')).toHaveValue('付け替える取引');
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '夫婦 / 外食' });
+    await signedIn
+      .getByRole('group', { name: '共有範囲' })
+      .getByRole('button', { name: '夫婦' })
+      .click();
+    await signedIn.getByLabel('カテゴリ').selectOption({ label: '外食' });
     // 移動先の既定割合が先に画面へ出る
     await expect(signedIn.getByLabel('taroの負担')).toHaveValue('500');
     await signedIn.getByRole('button', { name: '保存', exact: true }).click();
@@ -35,14 +62,16 @@ test.describe('共有範囲の変更', () => {
     await expect(signedIn.getByRole('heading', { name: '取引一覧' })).toBeVisible();
     const { data } = await adminClient()
       .from('transactions')
-      .select('category_id, categories(name, share_group_id)')
+      .select('share_group_id, categories(name)')
       .eq('id', id)
       .single();
     const moved = data as unknown as {
-      categories: { name: string; share_group_id: string | null };
+      share_group_id: string | null;
+      categories: { name: string };
     };
+    // カテゴリと共有範囲は別々に動く
     expect(moved.categories.name).toBe('外食');
-    expect(moved.categories.share_group_id).toBe(group);
+    expect(moved.share_group_id).toBe(group);
 
     // 負担は移動先の既定割合で作り直される
     const splits = await splitsOf(id);
@@ -50,16 +79,76 @@ test.describe('共有範囲の変更', () => {
     expect(splits.map((s) => s.user_id).sort()).toEqual([users.taro, users.hana].sort());
   });
 
-  test('列5 手で直した負担があると作り直す前に知らせる', async ({ signedIn, users }) => {
+  test('列1・列14 一覧でまとめて共有範囲を変えると負担が作り直される', async ({ signedIn, users }) => {
     const group = await seedGroup(users);
-    const own = await seedCategory({ ownerId: users.taro, name: '食費' });
+    const category = await seedCategory({ name: '食費' });
     const id = await seedTransaction({
-      categoryId: own,
+      categoryId: category,
+      ownerId: users.taro,
       payerId: users.taro,
       createdBy: users.taro,
-      occurredOn: '2026-09-01',
+      occurredOn: today(),
       amount: 1000,
+      memo: 'まとめて移す',
       splits: [{ userId: users.taro, amount: 1000 }],
+    });
+
+    await signedIn.goto('/transactions');
+    await signedIn.getByLabel('食費 を選ぶ').first().check();
+    await signedIn.getByLabel('付け替え先の共有範囲').selectOption({ label: '夫婦' });
+    await signedIn.getByRole('button', { name: '共有範囲を付け替える' }).click();
+
+    await expect.poll(() => scopeOf(id)).toBe(group);
+    const splits = await splitsOf(id);
+    expect(splits.map((s) => s.amount).sort()).toEqual([500, 500]);
+  });
+
+  test('列8 他人が負担している取引は個人へ戻せない', async ({ signedIn, users }) => {
+    const group = await seedGroup(users);
+    const category = await seedCategory({ name: '食費' });
+    const id = await seedTransaction({
+      categoryId: category,
+      shareGroupId: group,
+      payerId: users.taro,
+      createdBy: users.taro,
+      occurredOn: today(),
+      amount: 1000,
+      memo: '折半の取引',
+      splits: [
+        { userId: users.taro, amount: 500 },
+        { userId: users.hana, amount: 500 },
+      ],
+    });
+
+    await signedIn.goto('/transactions');
+    await signedIn.getByLabel('食費 を選ぶ').first().check();
+    await signedIn.getByLabel('付け替え先の共有範囲').selectOption({ label: '個人' });
+    await signedIn.getByRole('button', { name: '共有範囲を付け替える' }).click();
+
+    await expect(signedIn.getByRole('alert')).toContainText('負担している取引');
+    // 知らせるだけで、まだ移していない
+    expect(await scopeOf(id)).toBe(group);
+  });
+
+  test('列3・列15 カテゴリの付け替えでは共有範囲も手入力の負担も動かない', async ({
+    signedIn,
+    users,
+  }) => {
+    const group = await seedGroup(users);
+    const from = await seedCategory({ name: '食費' });
+    await seedCategory({ name: '日用品' });
+    const id = await seedTransaction({
+      categoryId: from,
+      shareGroupId: group,
+      payerId: users.taro,
+      createdBy: users.taro,
+      occurredOn: today(),
+      amount: 1000,
+      memo: '手で直した負担',
+      splits: [
+        { userId: users.taro, amount: 700 },
+        { userId: users.hana, amount: 300 },
+      ],
     });
     const { error } = await adminClient()
       .from('transactions')
@@ -67,125 +156,37 @@ test.describe('共有範囲の変更', () => {
       .eq('id', id);
     if (error !== null) throw error;
 
-    await signedIn.goto('/categories');
-    await signedIn.getByLabel('食費の移動先').selectOption({ label: '夫婦へ' });
-
-    await expect(signedIn.getByRole('alert')).toContainText('手で直した負担が 1 件');
-    // 知らせるだけで、まだ移していない
-    const { data } = await adminClient()
-      .from('categories')
-      .select('share_group_id')
-      .eq('id', own)
-      .single();
-    expect((data as { share_group_id: string | null }).share_group_id).toBeNull();
-
-    await signedIn.getByRole('button', { name: '移す' }).click();
-    await expect
-      .poll(async () => {
-        const moved = await adminClient()
-          .from('categories')
-          .select('share_group_id')
-          .eq('id', own)
-          .single();
-        return (moved.data as { share_group_id: string | null }).share_group_id;
-      })
-      .toBe(group);
-    const splits = await splitsOf(id);
-    expect(splits.map((s) => s.amount).sort()).toEqual([500, 500]);
-  });
-  test('列13 小分類だけでは共有範囲を変えられない', async ({ signedIn, users }) => {
-    await seedGroup(users);
-    const parent = await seedCategory({ ownerId: users.taro, name: '食費' });
-    await seedCategory({ ownerId: users.taro, name: '外食', parentId: parent });
-
-    await signedIn.goto('/categories');
-    await expect(signedIn.getByLabel('外食の名前')).toBeVisible();
-    // 小分類には移動先を選ぶ手立てがない（大分類ごと移す）
-    await expect(signedIn.getByLabel('外食の移動先')).toHaveCount(0);
-    await expect(signedIn.getByLabel('食費の移動先')).toHaveCount(1);
-  });
-
-  test('列14 大分類を移すと小分類とその取引も移る', async ({ signedIn, users }) => {
-    const group = await seedGroup(users);
-    const parent = await seedCategory({ ownerId: users.taro, name: '食費' });
-    const child = await seedCategory({ ownerId: users.taro, name: '外食', parentId: parent });
-    const tx = await seedTransaction({
-      categoryId: child,
-      payerId: users.taro,
-      createdBy: users.taro,
-      occurredOn: '2026-09-01',
-      amount: 1000,
-      splits: [{ userId: users.taro, amount: 1000 }],
-    });
-
-    await signedIn.goto('/categories');
-    await signedIn.getByLabel('食費の移動先').selectOption({ label: '夫婦へ' });
-
-    await expect
-      .poll(async () => {
-        const { data } = await adminClient()
-          .from('categories')
-          .select('share_group_id')
-          .eq('id', child)
-          .single();
-        return (data as { share_group_id: string | null }).share_group_id;
-      })
-      .toBe(group);
-
-    // 配下の取引は小分類に付いたまま、負担だけ移動先の既定割合で作り直される
-    const { data } = await adminClient()
-      .from('transactions')
-      .select('category_id')
-      .eq('id', tx)
-      .single();
-    expect((data as { category_id: string }).category_id).toBe(child);
-    const splits = await splitsOf(tx);
-    expect(splits.map((s) => s.amount).sort()).toEqual([500, 500]);
-  });
-
-  test('列15 統合すると移動元の小分類の取引が移動先の同名小分類へ移る', async ({
-    signedIn,
-    users,
-  }) => {
-    const group = await seedGroup(users);
-    const own = await seedCategory({ ownerId: users.taro, name: '食費' });
-    const ownChild = await seedCategory({ ownerId: users.taro, name: '外食', parentId: own });
-    const groupParent = await seedCategory({ shareGroupId: group, name: '食費' });
-    const groupChild = await seedCategory({
-      shareGroupId: group,
-      name: '外食',
-      parentId: groupParent,
-    });
-    const tx = await seedTransaction({
-      categoryId: ownChild,
-      payerId: users.taro,
-      createdBy: users.taro,
-      occurredOn: '2026-09-01',
-      amount: 1000,
-      splits: [{ userId: users.taro, amount: 1000 }],
-    });
-
-    await signedIn.goto('/categories');
-    await signedIn.getByLabel('食費の移動先').first().selectOption({ label: '夫婦へ' });
-    await expect(signedIn.getByRole('alert')).toContainText('統合しますか');
-    await signedIn.getByRole('button', { name: '統合して移す' }).click();
+    await signedIn.goto('/transactions');
+    await signedIn.getByLabel('食費 を選ぶ').first().check();
+    await signedIn.getByLabel('付け替え先のカテゴリ').selectOption({ label: '日用品' });
+    await signedIn.getByRole('button', { name: 'カテゴリを付け替える' }).click();
 
     await expect
       .poll(async () => {
         const { data } = await adminClient()
           .from('transactions')
-          .select('category_id')
-          .eq('id', tx)
+          .select('categories(name)')
+          .eq('id', id)
           .single();
-        return (data as { category_id: string }).category_id;
+        return (data as unknown as { categories: { name: string } }).categories.name;
       })
-      .toBe(groupChild);
+      .toBe('日用品');
 
-    // 移動元のカテゴリは親子とも消える
-    const { count } = await adminClient()
-      .from('categories')
-      .select('id', { count: 'exact', head: true })
-      .in('id', [own, ownChild]);
-    expect(count).toBe(0);
+    // 共有範囲が動かないので負担は作り直されない
+    expect(await scopeOf(id)).toBe(group);
+    const splits = await splitsOf(id);
+    expect(splits.find((s) => s.user_id === users.taro)?.amount).toBe(700);
+  });
+
+  test('列13 カテゴリ画面に共有範囲を変える手立ては無い', async ({ signedIn, users }) => {
+    await seedGroup(users);
+    const parent = await seedCategory({ name: '食費' });
+    await seedCategory({ name: '外食', parentId: parent });
+
+    await signedIn.goto('/categories');
+    await expect(signedIn.getByLabel('外食の名前')).toBeVisible();
+    // カテゴリは共有範囲を持たないので、移動先を選ぶ手立てそのものが無い
+    await expect(signedIn.getByLabel('食費の移動先')).toHaveCount(0);
+    await expect(signedIn.getByLabel('外食の移動先')).toHaveCount(0);
   });
 });

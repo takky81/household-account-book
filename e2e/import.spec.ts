@@ -16,9 +16,9 @@ async function transactions(): Promise<
 
 test.describe('CSVインポート', () => {
   test('列1・列2 負担の有無にかかわらず取り込める', async ({ signedIn, users }) => {
-    const group = await seedGroup(users);
-    await seedCategory({ shareGroupId: group, name: '家賃' });
-    await seedCategory({ ownerId: users.taro, name: '食費' });
+    await seedGroup(users);
+    await seedCategory({ name: '家賃' });
+    await seedCategory({ name: '食費' });
 
     await signedIn.goto('/import');
     await signedIn
@@ -51,8 +51,8 @@ test.describe('CSVインポート', () => {
     expect(splits.filter((s) => s.transactions.memo === '昼食').map((s) => s.amount)).toEqual([780]);
   });
 
-  test('列16 エラー行が混ざっても正しい行だけ取り込む', async ({ signedIn, users }) => {
-    await seedCategory({ ownerId: users.taro, name: '食費' });
+  test('列16 エラー行が混ざっても正しい行だけ取り込む', async ({ signedIn }) => {
+    await seedCategory({ name: '食費' });
 
     await signedIn.goto('/import');
     await signedIn
@@ -76,9 +76,10 @@ test.describe('CSVインポート', () => {
   });
 
   test('列4 同じ内容の取引は飛ばす', async ({ signedIn, users }) => {
-    const category = await seedCategory({ ownerId: users.taro, name: '食費' });
+    const category = await seedCategory({ name: '食費' });
     await seedTransaction({
       categoryId: category,
+      ownerId: users.taro,
       payerId: users.taro,
       createdBy: users.taro,
       occurredOn: '2026-09-01',
@@ -98,10 +99,9 @@ test.describe('CSVインポート', () => {
   });
   test('列17・列19 小分類つきで取り込み、未知の小分類は親の下に作る', async ({
     signedIn,
-    users,
   }) => {
-    const parent = await seedCategory({ ownerId: users.taro, name: '食費' });
-    const child = await seedCategory({ ownerId: users.taro, name: '外食', parentId: parent });
+    const parent = await seedCategory({ name: '食費' });
+    const child = await seedCategory({ name: '外食', parentId: parent });
     const withSub = '日付,収支,共有範囲,カテゴリ,小分類,金額,支払者,負担,備考';
 
     await signedIn.goto('/import');

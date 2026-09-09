@@ -22,10 +22,13 @@ import {
   type RecurringRunResult,
   type Workspace,
 } from '../../lib/db';
-import { scopeKey } from '../categories/name';
+import { scopeKey, type Scope } from '../categories/name';
 import { categoryPath, type TreeCategory } from '../categories/tree';
 import { toTreeCategory } from './model';
 import type { MemberLike } from '../groups/members';
+
+/** 共有範囲の選択肢。個人は ownerId が自分、グループは shareGroupId が入る */
+export type ScopeChoice = Scope & { key: string; label: string };
 
 type AuthState = {
   session: Session | null;
@@ -69,6 +72,11 @@ export type WorkspaceState = Workspace & {
   groupName: (shareGroupId: string) => string;
   /** 共有範囲の見出し。グループ名、または「個人」 */
   scopeLabel: (item: { share_group_id: string | null }) => string;
+  /**
+   * 選べる共有範囲（§2.4）。個人が先頭で、そのあとに自分が属するグループ。
+   * 取引・予算・定期登録ルールはここから1つ選ぶ
+   */
+  scopes: ScopeChoice[];
   /** カテゴリの階層を扱う形（tree.ts）。画面ごとに作り直さない */
   tree: TreeCategory[];
   /** 表示名。小分類は『大分類 / 小分類』（§3.4.1） */
@@ -145,6 +153,21 @@ export function WorkspaceProvider({ children, userId }: { children: ReactNode; u
       recurringResult,
       runRecurring,
       myGroupIds: data.members.filter((m) => m.user_id === userId).map((m) => m.share_group_id),
+      // 個人を先頭に、そのあとに自分が属するグループ。既定は先頭＝個人（§2.4）
+      scopes: [
+        { key: scopeKey(null, userId), shareGroupId: null, ownerId: userId, label: '個人' },
+        ...data.members
+          .filter((m) => m.user_id === userId)
+          .map((m) => data.groups.find((g) => g.id === m.share_group_id))
+          .filter((g): g is NonNullable<typeof g> => g !== undefined)
+          .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
+          .map((g) => ({
+            key: scopeKey(g.id, null),
+            shareGroupId: g.id,
+            ownerId: null,
+            label: g.name,
+          })),
+      ],
       displayName: (id) =>
         id === null ? '共用' : (data.profiles.find((p) => p.id === id)?.display_name ?? '不明'),
       groupName: (id) => data.groups.find((g) => g.id === id)?.name ?? '不明',
@@ -165,7 +188,7 @@ export function useWorkspace(): WorkspaceState {
   return value;
 }
 
-/** 共有範囲でカテゴリをまとめる。画面では常に共有範囲つきで見せる（§2.4）。 */
+/** 共有範囲で行をまとめる。取引・予算・ルールが共有範囲を持つ（§2.4）。 */
 export function groupByScope<T extends { share_group_id: string | null; owner_id: string | null }>(
   items: T[],
 ): { key: string; shareGroupId: string | null; ownerId: string | null; items: T[] }[] {

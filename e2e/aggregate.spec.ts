@@ -9,11 +9,12 @@ function today(): string {
 test.describe('集計', () => {
   test('列1・列2 対象範囲と集計基準で見える金額が変わる', async ({ signedIn, users }) => {
     const group = await seedGroup(users);
-    const shared = await seedCategory({ shareGroupId: group, name: '家賃' });
-    const own = await seedCategory({ ownerId: users.taro, name: '食費' });
+    const shared = await seedCategory({ name: '家賃' });
+    const own = await seedCategory({ name: '食費' });
     // はなこ が払い、折半した共有の支出
     await seedTransaction({
       categoryId: shared,
+      shareGroupId: group,
       payerId: users.hana,
       createdBy: users.taro,
       occurredOn: today(),
@@ -25,6 +26,7 @@ test.describe('集計', () => {
     });
     await seedTransaction({
       categoryId: own,
+      ownerId: users.taro,
       payerId: users.taro,
       createdBy: users.taro,
       occurredOn: today(),
@@ -55,8 +57,8 @@ test.describe('集計', () => {
     await expect(signedIn.getByTestId('expense')).toHaveText('300');
   });
 
-  test('列11 取引のない月は内訳が空になる', async ({ signedIn, users }) => {
-    await seedCategory({ ownerId: users.taro, name: '食費' });
+  test('列11 取引のない月は内訳が空になる', async ({ signedIn }) => {
+    await seedCategory({ name: '食費' });
 
     await signedIn.goto('/aggregate');
     await signedIn.getByRole('button', { name: '前の月' }).click();
@@ -65,8 +67,8 @@ test.describe('集計', () => {
     await expect(signedIn.getByTestId('expense')).toHaveText('0');
   });
   test('列12・列13 内訳は大分類で集約し、展開すると小分類が出る', async ({ signedIn, users }) => {
-    const parent = await seedCategory({ ownerId: users.taro, name: '食費' });
-    const child = await seedCategory({ ownerId: users.taro, name: '外食', parentId: parent });
+    const parent = await seedCategory({ name: '食費' });
+    const child = await seedCategory({ name: '外食', parentId: parent });
     for (const [categoryId, amount] of [
       [parent, 2000],
       [child, 3000],

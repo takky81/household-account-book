@@ -15,8 +15,6 @@ const make = (over: Partial<TreeCategory> & { id: string }): TreeCategory => ({
   parentId: null,
   name: '食費',
   kind: 'expense',
-  shareGroupId: 'g1',
-  ownerId: null,
   sortOrder: 10,
   isSystem: false,
   isArchived: false,
@@ -54,13 +52,14 @@ describe('siblingsOf', () => {
     expect(siblingsOf(all, 外食).map((c) => c.name)).toEqual(['自炊', '外食']);
   });
 
-  it('列14 大分類の兄弟は同じ共有範囲・同じ収支区分の大分類だけ（未分類を除く）', () => {
+  it('列14 大分類の兄弟は同じ収支区分の大分類だけ（未分類を除く）', () => {
     expect(siblingsOf(all, 食費).map((c) => c.name)).toEqual(['食費', '日用品']);
   });
 
-  it('共有範囲が違えば兄弟にならない', () => {
-    const 個人の食費 = make({ id: 'c-own', shareGroupId: null, ownerId: 'u1' });
-    expect(siblingsOf([...all, 個人の食費], 個人の食費).map((c) => c.id)).toEqual(['c-own']);
+  it('カテゴリは全ユーザー共通なので、共有範囲では兄弟が分かれない', () => {
+    const 交際費 = make({ id: 'c-party', name: '交際費', sortOrder: 30 });
+    expect(siblingsOf([...all, 交際費], 交際費).map((c) => c.id)).toContain('c-party');
+    expect(siblingsOf([...all, 交際費], 交際費).length).toBe(3);
   });
 });
 

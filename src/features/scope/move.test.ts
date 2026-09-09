@@ -14,11 +14,6 @@ const tx = (over: Partial<MoveTx> = {}): MoveTx => ({
   ...over,
 });
 
-const categories = [
-  { id: 'c1', parentId: null, shareGroupId: null, ownerId: taro, kind: 'expense' as const, name: '食費', isArchived: false },
-  { id: 'c2', parentId: null, shareGroupId: 夫婦, ownerId: null, kind: 'expense' as const, name: '食費', isArchived: false },
-];
-
 describe('scopeChanged', () => {
   it('列10 同じ共有範囲なら変わっていない', () => {
     expect(scopeChanged({ shareGroupId: 夫婦, ownerId: null }, { shareGroupId: 夫婦, ownerId: null })).toBe(
@@ -37,24 +32,18 @@ describe('checkMove', () => {
   const base = {
     source: { shareGroupId: null, ownerId: taro },
     dest: { shareGroupId: 夫婦, ownerId: null },
-    kind: 'expense' as const,
-    name: '光熱費',
-    categories: [],
     transactions: [tx()],
     destMemberIds: [taro, hana],
     selfId: taro,
     myGroupIds: [夫婦],
-    sourceCategoryId: 'c1',
   };
 
   it('列1 条件が揃えば移せる', () => {
     expect(checkMove(base)).toEqual({ ok: true });
   });
 
-  it('列2 移動先に同じ収支区分・同じ名前があると中止する', () => {
-    const result = checkMove({ ...base, name: '食費', categories });
-    expect(result).toMatchObject({ ok: false, reason: 'name-conflict' });
-  });
+  // 列2（移動先に同名のカテゴリがあれば中止）はもう無い。カテゴリは共有範囲を持たず、
+  // 動かすのは取引だけなので、名前が衝突しようがない
 
   it('列4 移動先が個人なら、他人が支払った取引があると中止する', () => {
     const result = checkMove({

@@ -56,6 +56,20 @@ export function Field({
   );
 }
 
+/**
+ * ラベルつきの囲い。中身が Tabs のような操作部品のときはこちらを使う。
+ * Field は <label> なので、中の最初のボタンにラベルの文字が名前として移ってしまい、
+ * 「共有範囲 共有範囲」のような読み上げ名になる。
+ */
+export function FieldGroup({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-xs text-[var(--c-muted)]">{label}</span>
+      {children}
+    </div>
+  );
+}
+
 const inputClass =
   'rounded-md border border-[var(--c-edge)] bg-[var(--c-panel)] px-2 py-1.5 text-sm text-[var(--c-ink)]';
 

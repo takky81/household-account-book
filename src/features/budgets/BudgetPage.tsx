@@ -1,7 +1,12 @@
-/** 予算画面（決定表「予算」）。実績は集計基準によらずカテゴリの支出総額。 */
+/**
+ * 予算画面（決定表「予算」）。実績は集計基準によらずカテゴリの支出総額。
+ *
+ * 予算は共有範囲ごとに置く（§3.7）。カテゴリは全ユーザー共通なので、同じ「食費」に
+ * 共有の枠と個人の枠が並びうる。表は共有範囲を1つ選んで作る。
+ */
 
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Card, ErrorText, Meter, ScopeTag } from '../../components/ui';
+import { Button, Card, ErrorText, Meter, Tabs } from '../../components/ui';
 import { MonthNav } from '../app/Layout';
 import { addMonths, currentMonthKey, monthStart } from '../../lib/date';
 import { formatAmount, parseAmount } from '../../lib/money';
@@ -15,13 +20,15 @@ import {
 } from '../../lib/db';
 import { useAuth, useWorkspace } from '../app/context';
 import { actualsByCategory, selfBurdenByCategory } from '../app/model';
-import { buildBudgetRows, copyBudgets, scopeTotals, validateBudgetAmount } from './usage';
+import { budgetTotal, buildBudgetRows, copyBudgets, validateBudgetAmount } from './usage';
 
 export function BudgetPage() {
   const workspace = useWorkspace();
   const { userId } = useAuth();
   const selfId = userId!;
   const [monthKey, setMonthKey] = useState(currentMonthKey());
+  /** 表に出す共有範囲。既定は先頭＝個人（§2.4） */
+  const [scopeKeyValue, setScopeKeyValue] = useState(workspace.scopes[0]?.key ?? '');
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [previous, setPrevious] = useState<Budget[]>([]);
   const [rows, setRows] = useState<Transaction[]>([]);
@@ -50,18 +57,33 @@ export function BudgetPage() {
     void reload().finally(() => setLoaded(true));
   }, [reload]);
 
+  const scope = workspace.scopes.find((s) => s.key === scopeKeyValue) ?? workspace.scopes[0] ?? null;
+  const inScope = <T extends { share_group_id: string | null; owner_id: string | null }>(item: T) =>
+    scope !== null &&
+    item.share_group_id === scope.shareGroupId &&
+    item.owner_id === scope.ownerId;
+
+  const scopedRows = rows.filter(inScope);
   const budgetRows = buildBudgetRows({
     categories: workspace.tree,
-    budgets: budgets.map((b) => ({ categoryId: b.category_id, amount: b.amount })),
-    actuals: actualsByCategory(rows),
-    selfBurden: selfBurdenByCategory(rows, selfId),
+    budgets: budgets
+      .filter(inScope)
+      .map((b) => ({ categoryId: b.category_id, amount: b.amount })),
+    actuals: actualsByCategory(scopedRows),
+    selfBurden: selfBurdenByCategory(scopedRows, selfId),
   });
-  const totals = scopeTotals(budgetRows);
+  const total = budgetTotal(budgetRows);
 
   async function change(categoryId: string, text: string) {
     setError('');
+    if (scope === null) return;
     if (text.trim() === '') {
-      await deleteBudget(categoryId, monthStart(monthKey));
+      await deleteBudget({
+        categoryId,
+        month: monthStart(monthKey),
+        shareGroupId: scope.shareGroupId,
+        ownerId: scope.ownerId,
+      });
       await reload();
       return;
     }
@@ -72,7 +94,13 @@ export function BudgetPage() {
       return;
     }
     try {
-      await saveBudget({ categoryId, month: monthStart(monthKey), amount: amount! });
+      await saveBudget({
+        categoryId,
+        month: monthStart(monthKey),
+        amount: amount!,
+        shareGroupId: scope.shareGroupId,
+        ownerId: scope.ownerId,
+      });
       await reload();
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : '保存できませんでした');
@@ -80,13 +108,19 @@ export function BudgetPage() {
   }
 
   async function copyPrevious() {
+    if (scope === null) return;
+    // 複製するのは今見ている共有範囲の枠だけ。他の範囲の枠まで動かさない
     const entries = copyBudgets(
-      previous.map((b) => ({ categoryId: b.category_id, month: b.month, amount: b.amount })),
+      previous
+        .filter(inScope)
+        .map((b) => ({ categoryId: b.category_id, month: b.month, amount: b.amount })),
       monthKey,
-      budgets.map((b) => ({ categoryId: b.category_id, month: b.month, amount: b.amount })),
+      budgets
+        .filter(inScope)
+        .map((b) => ({ categoryId: b.category_id, month: b.month, amount: b.amount })),
     );
     for (const entry of entries) {
-      await saveBudget(entry);
+      await saveBudget({ ...entry, shareGroupId: scope.shareGroupId, ownerId: scope.ownerId });
     }
     await reload();
   }
@@ -95,6 +129,13 @@ export function BudgetPage() {
     <main className="mx-auto flex max-w-3xl flex-col gap-3 p-3">
       <h1 className="text-lg font-bold">予算</h1>
       <MonthNav monthKey={monthKey} onChange={setMonthKey} />
+
+      <Tabs
+        label="共有範囲"
+        value={scopeKeyValue}
+        onChange={setScopeKeyValue}
+        options={workspace.scopes.map((s) => ({ value: s.key, label: s.label }))}
+      />
 
       <div>
         <Button variant="ghost" onClick={() => void copyPrevious()}>
@@ -111,7 +152,6 @@ export function BudgetPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-[var(--c-subtle)] text-left text-xs text-[var(--c-ink-soft)]">
-              <th className="p-2">共有範囲</th>
               <th className="p-2">カテゴリ</th>
               <th className="p-2 text-right">予算</th>
               <th className="p-2 text-right">実績</th>
@@ -123,12 +163,6 @@ export function BudgetPage() {
           <tbody>
             {budgetRows.map((row) => (
               <tr key={row.categoryId} className="border-t border-[var(--c-line)]">
-                <td className="p-2">
-                  <ScopeTag
-                    label={workspace.scopeLabel({ share_group_id: row.shareGroupId })}
-                    kind={row.shareGroupId === null ? 'own' : 'group'}
-                  />
-                </td>
                 <td className="p-2">
                   {row.name}
                   {/* 小分類ごとの実績を内訳として出す（§5.6） */}
@@ -168,20 +202,13 @@ export function BudgetPage() {
             ))}
           </tbody>
           <tfoot>
-            {totals.map((total) => (
-              <tr
-                key={`${total.shareGroupId ?? ''}${total.ownerId ?? ''}`}
-                className="border-t border-[var(--c-line)] bg-[var(--c-subtle)] text-xs"
-              >
-                <th className="p-2 text-left" colSpan={2}>
-                  {workspace.scopeLabel({ share_group_id: total.shareGroupId })}の合計
-                </th>
-                <td className="p-2 text-right tabular-nums">{formatAmount(total.budget)}</td>
-                <td className="p-2 text-right tabular-nums">{formatAmount(total.actual)}</td>
-                <td className="p-2 text-right tabular-nums">{formatAmount(total.remaining)}</td>
-                <td colSpan={2}></td>
-              </tr>
-            ))}
+            <tr className="border-t border-[var(--c-line)] bg-[var(--c-subtle)] text-xs">
+              <th className="p-2 text-left">{scope?.label ?? ''}の合計</th>
+              <td className="p-2 text-right tabular-nums">{formatAmount(total.budget)}</td>
+              <td className="p-2 text-right tabular-nums">{formatAmount(total.actual)}</td>
+              <td className="p-2 text-right tabular-nums">{formatAmount(total.remaining)}</td>
+              <td colSpan={2}></td>
+            </tr>
           </tfoot>
         </table>
       </Card>

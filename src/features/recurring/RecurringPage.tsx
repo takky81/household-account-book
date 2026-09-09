@@ -11,6 +11,7 @@ import {
   Card,
   ErrorText,
   Field,
+  FieldGroup,
   Note,
   ScopeTag,
   Tabs,
@@ -26,6 +27,7 @@ import {
   type RecurringRule,
 } from '../../lib/db';
 import { useAuth, useWorkspace } from '../app/context';
+import { scopeKey } from '../categories/name';
 import { selectableCategories } from '../categories/tree';
 import { nextDueDate } from './schedule';
 import { validateRecurringRule } from './validation';
@@ -40,6 +42,8 @@ function toMonthKey(value: string): string {
 type FormState = {
   id?: string;
   categoryId: string;
+  /** 共有範囲（§2.4）。カテゴリではなくルールが持つ */
+  scopeKey: string;
   amountText: string;
   dayText: string;
   startMonth: string;
@@ -49,9 +53,10 @@ type FormState = {
   splits: Split[] | null;
 };
 
-function emptyForm(selfId: string): FormState {
+function emptyForm(selfId: string, scopeKey: string): FormState {
   return {
     categoryId: '',
+    scopeKey,
     amountText: '',
     dayText: '1',
     startMonth: currentMonthKey(),
@@ -86,10 +91,12 @@ export function RecurringPage() {
 
   const category =
     form === null ? null : (workspace.categories.find((c) => c.id === form.categoryId) ?? null);
-  const isPersonal = category !== null && category.share_group_id === null;
+  const scope =
+    form === null ? null : (workspace.scopes.find((s) => s.key === form.scopeKey) ?? null);
+  const isPersonal = scope !== null && scope.shareGroupId === null;
   const members = useMemo(
-    () => (category?.share_group_id != null ? workspace.membersOf(category.share_group_id) : []),
-    [category?.share_group_id, workspace],
+    () => (scope?.shareGroupId != null ? workspace.membersOf(scope.shareGroupId) : []),
+    [scope?.shareGroupId, workspace],
   );
   const amount = form === null ? 0 : (parseAmount(form.amountText) ?? 0);
   const payerId = form === null || form.payer === SHARED ? null : form.payer;
@@ -97,7 +104,7 @@ export function RecurringPage() {
   // 既定の按分。雛形を持たないルールは生成のたびにこの規則で割る（§5.1）
   const autoSplits = useMemo(
     () =>
-      category === null || amount <= 0
+      category === null || scope === null || amount <= 0
         ? []
         : defaultSplits({
             members: members.map((m) => ({
@@ -108,16 +115,19 @@ export function RecurringPage() {
             amount,
             kind: category.kind,
             payerId,
-            ownerId: isPersonal ? category.owner_id : null,
+            ownerId: isPersonal ? scope.ownerId : null,
           }),
-    [category, amount, members, payerId, isPersonal],
+    [category, scope, amount, members, payerId, isPersonal],
   );
   const splits = form?.splits ?? autoSplits;
 
   function startNew() {
     setError('');
     const first = categories[0];
-    setForm({ ...emptyForm(selfId), categoryId: first?.id ?? '' });
+    setForm({
+      ...emptyForm(selfId, workspace.scopes[0]?.key ?? ''),
+      categoryId: first?.id ?? '',
+    });
   }
 
   function startEdit(rule: RecurringRule) {
@@ -125,6 +135,7 @@ export function RecurringPage() {
     setForm({
       id: rule.id,
       categoryId: rule.category_id,
+      scopeKey: scopeKey(rule.share_group_id, rule.owner_id),
       amountText: String(rule.amount),
       dayText: String(rule.day_of_month),
       startMonth: toMonthKey(rule.start_month),
@@ -141,13 +152,19 @@ export function RecurringPage() {
     if (form === null) return;
     setError('');
     const parsed = parseAmount(form.amountText);
+    if (scope === null) {
+      setError('共有範囲を選んでください');
+      return;
+    }
     const input = {
       categoryId: form.categoryId,
+      shareGroupId: scope.shareGroupId,
+      ownerId: scope.ownerId,
       amount: parsed ?? 0,
       dayOfMonth: Number(form.dayText),
       startMonth: form.startMonth,
       endMonth: form.endMonth === '' ? null : form.endMonth,
-      // 個人カテゴリの負担は本人1行＝全額に決まるので雛形を持たせない（§3.6）
+      // 個人の負担は本人1行＝全額に決まるので雛形を持たせない（§3.6）
       splits: isPersonal || form.splits === null ? undefined : form.splits,
     };
     const check = validateRecurringRule(input);
@@ -180,6 +197,8 @@ export function RecurringPage() {
       await saveRecurringRule({
         id: rule.id,
         categoryId: rule.category_id,
+        shareGroupId: rule.share_group_id,
+        ownerId: rule.owner_id,
         amount: rule.amount,
         dayOfMonth: rule.day_of_month,
         startMonth: toMonthKey(rule.start_month),
@@ -235,12 +254,11 @@ export function RecurringPage() {
               <Card className="flex flex-col gap-1">
                 <div className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-1 text-sm">
-                    {target !== undefined && (
-                      <ScopeTag
-                        label={workspace.scopeLabel(target)}
-                        kind={target.share_group_id === null ? 'own' : 'group'}
-                      />
-                    )}
+                    {/* 共有範囲はルールが持つ（§2.4） */}
+                    <ScopeTag
+                      label={workspace.scopeLabel(rule)}
+                      kind={rule.share_group_id === null ? 'own' : 'group'}
+                    />
                     {workspace.categoryPath(rule.category_id)}
                   </span>
                   <span className="text-sm">{formatAmount(rule.amount)}</span>
@@ -292,6 +310,15 @@ export function RecurringPage() {
             {form.id === undefined ? 'ルールを追加' : 'ルールを編集'}
           </h2>
 
+          <FieldGroup label="共有範囲">
+            <Tabs
+              label="共有範囲"
+              value={form.scopeKey}
+              onChange={(next) => setForm({ ...form, scopeKey: next, splits: null })}
+              options={workspace.scopes.map((s) => ({ value: s.key, label: s.label }))}
+            />
+          </FieldGroup>
+
           <Field label="カテゴリ">
             <select
               aria-label="カテゴリ"
@@ -302,7 +329,6 @@ export function RecurringPage() {
               <option value="">選んでください</option>
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {workspace.scopeLabel({ share_group_id: c.shareGroupId })} /{' '}
                   {workspace.categoryPath(c.id)}
                 </option>
               ))}
@@ -346,7 +372,7 @@ export function RecurringPage() {
           </Field>
 
           {!isPersonal && members.length > 0 && (
-            <Field label="支払者">
+            <FieldGroup label="支払者">
               <Tabs
                 label="支払者"
                 value={form.payer}
@@ -359,7 +385,7 @@ export function RecurringPage() {
                   { value: SHARED, label: '共用' },
                 ]}
               />
-            </Field>
+            </FieldGroup>
           )}
 
           {/* 個人カテゴリの負担は本人1行＝全額に決まるので出さない（§3.6） */}

@@ -13,9 +13,10 @@ async function downloadCsv(page: Page): Promise<string> {
 test.describe('CSVエクスポート', () => {
   test('列1・列3・列5 取引を書き出すと負担と共用払いが出る', async ({ signedIn, users }) => {
     const group = await seedGroup(users);
-    const category = await seedCategory({ shareGroupId: group, name: '家賃' });
+    const category = await seedCategory({ name: '家賃' });
     await seedTransaction({
       categoryId: category,
+      shareGroupId: group,
       payerId: null,
       createdBy: users.taro,
       occurredOn: '2026-09-01',
@@ -57,10 +58,11 @@ test.describe('CSVエクスポート', () => {
     );
   });
   test('列11・列12 小分類の列が出る', async ({ signedIn, users }) => {
-    const parent = await seedCategory({ ownerId: users.taro, name: '食費' });
-    const child = await seedCategory({ ownerId: users.taro, name: '外食', parentId: parent });
+    const parent = await seedCategory({ name: '食費' });
+    const child = await seedCategory({ name: '外食', parentId: parent });
     await seedTransaction({
       categoryId: child,
+      ownerId: users.taro,
       payerId: users.taro,
       createdBy: users.taro,
       occurredOn: '2026-09-01',
@@ -76,7 +78,8 @@ test.describe('CSVエクスポート', () => {
 
     await signedIn.getByRole('button', { name: 'カテゴリ', exact: true }).click();
     const categories = await downloadCsv(signedIn);
-    expect(categories).toContain('共有範囲,収支,カテゴリ,小分類,色,表示順,未分類,アーカイブ済み');
-    expect(categories).toContain('個人,支出,食費,外食,');
+    // カテゴリ CSV は共有範囲の列を持たない（§4.3）
+    expect(categories).toContain('収支,カテゴリ,小分類,色,表示順,未分類,アーカイブ済み');
+    expect(categories).toContain('支出,食費,外食,');
   });
 });

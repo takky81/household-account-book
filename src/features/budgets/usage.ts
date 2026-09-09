@@ -1,9 +1,12 @@
 /**
  * 予算の消化（docs/仕様書.md §5.6）。決定表「予算」に対応する。
  *
- * 実績は集計基準によらず、そのカテゴリの対象月の支出総額を使う。共有カテゴリの予算は
+ * 実績は集計基準によらず、そのカテゴリの対象月の支出総額を使う。共有の予算は
  * 共同の枠であり、負担額基準にすると枠が人数分に割れて意味を失うため。
  * 自分の負担は参考値として併記する（消化率には使わない）。
+ *
+ * 予算は（カテゴリ, 共有範囲, 対象月）で1件（§3.7）。カテゴリは全ユーザー共通なので、
+ * 同じ「食費」に共有の枠と個人の枠が並ぶ。画面は共有範囲を1つ選んで表を作る。
  */
 
 import type { CategoryLike } from '../categories/name';
@@ -20,8 +23,6 @@ export type BudgetChild = { categoryId: string; name: string; actual: number };
 export type BudgetRow = {
   categoryId: string;
   name: string;
-  shareGroupId: string | null;
-  ownerId: string | null;
   budget: number | null;
   /** 配下の小分類を含む実績（§5.6） */
   actual: number;
@@ -69,8 +70,6 @@ export function buildBudgetRows(input: {
       return {
         categoryId: c.id,
         name: c.name,
-        shareGroupId: c.shareGroupId,
-        ownerId: c.ownerId,
         budget,
         actual,
         selfBurden,
@@ -80,32 +79,16 @@ export function buildBudgetRows(input: {
     });
 }
 
-export type ScopeTotal = {
-  shareGroupId: string | null;
-  ownerId: string | null;
-  budget: number;
-  actual: number;
-  remaining: number;
-};
+export type BudgetTotal = { budget: number; actual: number; remaining: number };
 
-/** 共有範囲ごとの合計（列11）。共有範囲全体の予算という行は持たないため、ここで足す。 */
-export function scopeTotals(rows: BudgetRow[]): ScopeTotal[] {
-  const totals = new Map<string, ScopeTotal>();
-  for (const row of rows) {
-    const key = row.shareGroupId !== null ? `group:${row.shareGroupId}` : `own:${row.ownerId}`;
-    const found = totals.get(key) ?? {
-      shareGroupId: row.shareGroupId,
-      ownerId: row.ownerId,
-      budget: 0,
-      actual: 0,
-      remaining: 0,
-    };
-    found.budget += row.budget ?? 0;
-    found.actual += row.actual;
-    found.remaining = found.budget - found.actual;
-    totals.set(key, found);
-  }
-  return [...totals.values()];
+/**
+ * 表の合計（列11）。共有範囲全体の予算という行は持たないため、ここで足す。
+ * 表は共有範囲1つぶんなので、合計も1行になる。
+ */
+export function budgetTotal(rows: BudgetRow[]): BudgetTotal {
+  const budget = rows.reduce((sum, row) => sum + (row.budget ?? 0), 0);
+  const actual = rows.reduce((sum, row) => sum + row.actual, 0);
+  return { budget, actual, remaining: budget - actual };
 }
 
 export type BudgetEntry = { categoryId: string; month: string; amount: number };

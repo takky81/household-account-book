@@ -4,8 +4,6 @@ import { findNameConflict, normalizeCategoryName, scopeKey, validateCategoryName
 const cat = (over: Partial<Parameters<typeof findNameConflict>[0][number]>) => ({
   id: 'c1',
   parentId: null as string | null,
-  shareGroupId: 'g1' as string | null,
-  ownerId: null as string | null,
   kind: 'expense' as const,
   name: '食費',
   isArchived: false,
@@ -26,40 +24,24 @@ describe('カテゴリ名', () => {
 describe('findNameConflict', () => {
   const existing = [cat({})];
 
-  it('列3 同じ共有範囲・同じ収支区分に同名があれば衝突', () => {
-    const found = findNameConflict(existing, {
-      shareGroupId: 'g1',
-      ownerId: null,
-      kind: 'expense',
-      name: '食費',
-    });
+  it('列3 同じ収支区分に同名があれば衝突', () => {
+    const found = findNameConflict(existing, { kind: 'expense', name: '食費' });
     expect(found?.id).toBe('c1');
   });
 
-  it('列4 共有範囲が違えば衝突しない', () => {
-    const found = findNameConflict(existing, {
-      shareGroupId: null,
-      ownerId: 'u1',
-      kind: 'expense',
-      name: '食費',
-    });
-    expect(found).toBeNull();
+  it('列4 カテゴリは全ユーザー共通なので、共有範囲では逃げられない', () => {
+    // 以前は『夫婦 / 食費』と『個人 / 食費』を並べられたが、共通マスタでは1つに決まる
+    const found = findNameConflict(existing, { kind: 'expense', name: '食費' });
+    expect(found?.id).toBe('c1');
   });
 
   it('収支区分が違えば衝突しない', () => {
-    const found = findNameConflict(existing, {
-      shareGroupId: 'g1',
-      ownerId: null,
-      kind: 'income',
-      name: '食費',
-    });
+    const found = findNameConflict(existing, { kind: 'income', name: '食費' });
     expect(found).toBeNull();
   });
 
   it('列5 アーカイブ済みも衝突として数える', () => {
     const found = findNameConflict([cat({ isArchived: true })], {
-      shareGroupId: 'g1',
-      ownerId: null,
       kind: 'expense',
       name: '食費',
     });
@@ -67,21 +49,12 @@ describe('findNameConflict', () => {
   });
 
   it('列3 前後の空白は落としてから比べる', () => {
-    const found = findNameConflict(existing, {
-      shareGroupId: 'g1',
-      ownerId: null,
-      kind: 'expense',
-      name: ' 食費 ',
-    });
+    const found = findNameConflict(existing, { kind: 'expense', name: ' 食費 ' });
     expect(found?.id).toBe('c1');
   });
 
   it('自分自身とは衝突しない（編集のとき）', () => {
-    const found = findNameConflict(
-      existing,
-      { shareGroupId: 'g1', ownerId: null, kind: 'expense', name: '食費' },
-      'c1',
-    );
+    const found = findNameConflict(existing, { kind: 'expense', name: '食費' }, 'c1');
     expect(found).toBeNull();
   });
 });
@@ -92,8 +65,6 @@ describe('findNameConflict（小分類）', () => {
 
   it('列16 同じ親に同じ名前の小分類があれば衝突', () => {
     const found = findNameConflict([食費, 外食], {
-      shareGroupId: 'g1',
-      ownerId: null,
       kind: 'expense',
       name: '外食',
       parentId: 'c-food',
@@ -103,8 +74,6 @@ describe('findNameConflict（小分類）', () => {
 
   it('列17 親が違えば同じ名前でも衝突しない', () => {
     const found = findNameConflict([食費, 外食], {
-      shareGroupId: 'g1',
-      ownerId: null,
       kind: 'expense',
       name: '外食',
       parentId: 'c-other',
@@ -113,20 +82,12 @@ describe('findNameConflict（小分類）', () => {
   });
 
   it('大分類と小分類は名前が同じでも衝突しない', () => {
-    const found = findNameConflict([外食], {
-      shareGroupId: 'g1',
-      ownerId: null,
-      kind: 'expense',
-      name: '外食',
-      parentId: null,
-    });
+    const found = findNameConflict([外食], { kind: 'expense', name: '外食', parentId: null });
     expect(found).toBeNull();
   });
 
-  it('小分類は同じ共有範囲の大分類とは衝突しない', () => {
+  it('小分類は大分類とは衝突しない', () => {
     const found = findNameConflict([食費], {
-      shareGroupId: 'g1',
-      ownerId: null,
       kind: 'expense',
       name: '食費',
       parentId: 'c-daily',

@@ -18,10 +18,9 @@ const context = (over: Partial<ImportContext> = {}): ImportContext => ({
     ],
   },
   categories: [
-    { id: 'c1', parentId: null, shareGroupId: 'g1', ownerId: null, kind: 'expense', name: '家賃', isArchived: false },
-    { id: 'c2', parentId: null, shareGroupId: 'g1', ownerId: null, kind: 'expense', name: '未分類', isArchived: false, isSystem: true },
-    { id: 'c3', parentId: null, shareGroupId: null, ownerId: 'u1', kind: 'expense', name: '食費', isArchived: false },
-    { id: 'c4', parentId: null, shareGroupId: null, ownerId: 'u1', kind: 'expense', name: '未分類', isArchived: false, isSystem: true },
+    { id: 'c1', parentId: null, kind: 'expense', name: '家賃', isArchived: false },
+    { id: 'c2', parentId: null, kind: 'expense', name: '未分類', isArchived: false, isSystem: true },
+    { id: 'c3', parentId: null, kind: 'expense', name: '食費', isArchived: false },
   ],
   existing: [],
   unknownCategory: 'uncategorized',
@@ -130,8 +129,6 @@ describe('analyzeImport', () => {
     });
     const entry = result.entries[0]!;
     expect(entry.status === 'ok' && entry.payload.newCategory).toEqual({
-      shareGroupId: 'g1',
-      ownerId: null,
       kind: 'expense',
       name: '日用品',
       parentId: null,
@@ -194,7 +191,7 @@ describe('analyzeImport', () => {
 
 describe('analyzeImport（小分類）', () => {
   const withSub = '日付,収支,共有範囲,カテゴリ,小分類,金額,支払者,負担,備考';
-  const 外食 = { id: 'c5', parentId: 'c3', shareGroupId: null, ownerId: 'u1', kind: 'expense' as const, name: '外食', isArchived: false };
+  const 外食 = { id: 'c5', parentId: 'c3', kind: 'expense' as const, name: '外食', isArchived: false };
   const subContext = (over: Partial<ImportContext> = {}) => {
     const base = context(over);
     return { ...base, categories: [...base.categories, 外食] };
@@ -230,7 +227,7 @@ describe('analyzeImport（小分類）', () => {
       status: 'ok',
       payload: {
         categoryId: null,
-        newCategory: { parentId: 'c3', name: '自炊', shareGroupId: null, ownerId: 'u1', kind: 'expense' },
+        newCategory: { parentId: 'c3', name: '自炊', kind: 'expense' },
       },
     });
   });
@@ -251,7 +248,7 @@ describe('analyzeImport（小分類）', () => {
     });
     expect(result.entries[0]).toMatchObject({
       status: 'ok',
-      payload: { categoryId: 'c4', newCategory: null },
+      payload: { categoryId: 'c2', newCategory: null },
     });
   });
 

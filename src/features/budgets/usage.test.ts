@@ -4,7 +4,7 @@ import {
   buildBudgetRows,
   budgetUsage,
   copyBudgets,
-  scopeTotals,
+  budgetTotal,
   validateBudgetAmount,
 } from './usage';
 
@@ -27,10 +27,10 @@ describe('budgetUsage', () => {
 });
 
 const categories = [
-  { id: 'c1', parentId: null, shareGroupId: 'g1', ownerId: null, kind: 'expense' as const, name: '家賃', isArchived: false },
-  { id: 'c2', parentId: null, shareGroupId: 'g1', ownerId: null, kind: 'expense' as const, name: '食費', isArchived: false },
-  { id: 'c3', parentId: null, shareGroupId: null, ownerId: 'u1', kind: 'expense' as const, name: '交際費', isArchived: false },
-  { id: 'c9', parentId: null, shareGroupId: 'g1', ownerId: null, kind: 'income' as const, name: '給与', isArchived: false },
+  { id: 'c1', parentId: null, kind: 'expense' as const, name: '家賃', isArchived: false },
+  { id: 'c2', parentId: null, kind: 'expense' as const, name: '食費', isArchived: false },
+  { id: 'c3', parentId: null, kind: 'expense' as const, name: '交際費', isArchived: false },
+  { id: 'c9', parentId: null, kind: 'income' as const, name: '給与', isArchived: false },
 ];
 
 const rows = () =>
@@ -74,8 +74,8 @@ describe('buildBudgetRows', () => {
 describe('buildBudgetRows（小分類）', () => {
   const withChildren = [
     ...categories,
-    { id: 'c2-eat', parentId: 'c2', shareGroupId: 'g1', ownerId: null, kind: 'expense' as const, name: '外食', isArchived: false },
-    { id: 'c2-cook', parentId: 'c2', shareGroupId: 'g1', ownerId: null, kind: 'expense' as const, name: '自炊', isArchived: false },
+    { id: 'c2-eat', parentId: 'c2', kind: 'expense' as const, name: '外食', isArchived: false },
+    { id: 'c2-cook', parentId: 'c2', kind: 'expense' as const, name: '自炊', isArchived: false },
   ];
 
   const list = () =>
@@ -111,24 +111,18 @@ describe('buildBudgetRows（小分類）', () => {
     expect(家賃.children).toEqual([]);
   });
 
-  it('列11 共有範囲の合計を小分類で二重に数えない', () => {
-    const group = scopeTotals(list()).find((t) => t.shareGroupId === 'g1')!;
-    expect(group.actual).toBe(62400);
-    expect(group.budget).toBe(55000);
+  it('列11 合計を小分類で二重に数えない', () => {
+    const total = budgetTotal(list().filter((r) => r.categoryId === 'c2'));
+    expect(total.actual).toBe(62400);
   });
 });
 
-describe('scopeTotals', () => {
-  it('列11 共有範囲ごとに予算と実績の合計を出す', () => {
-    const totals = scopeTotals(rows());
-    const group = totals.find((t) => t.shareGroupId === 'g1')!;
-    expect(group.budget).toBe(175000);
-    expect(group.actual).toBe(182400);
-    expect(group.remaining).toBe(-7400);
-
-    const own = totals.find((t) => t.ownerId === 'u1')!;
-    expect(own.budget).toBe(20000);
-    expect(own.actual).toBe(8200);
+describe('budgetTotal', () => {
+  it('列11 表の予算と実績の合計を出す。表は共有範囲1つぶん', () => {
+    const total = budgetTotal(rows());
+    expect(total.budget).toBe(195000);
+    expect(total.actual).toBe(190600);
+    expect(total.remaining).toBe(4400);
   });
 });
 

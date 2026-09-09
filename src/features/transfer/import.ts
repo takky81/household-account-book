@@ -35,9 +35,8 @@ export type ImportContext = {
   duplicates: 'import' | 'skip';
 };
 
+/** 取り込み中に作る必要が出たカテゴリ。カテゴリは全員共通なので共有範囲を持たない */
 export type NewCategory = {
-  shareGroupId: string | null;
-  ownerId: string | null;
   kind: Kind;
   name: string;
   /** 小分類として作る場合の親。大分類ごと未知なら null（列19） */
@@ -46,6 +45,9 @@ export type NewCategory = {
 
 export type ImportPayload = {
   categoryId: string | null;
+  /** 共有範囲。CSV の「共有範囲」列から決まり、取引が持つ（§2.4） */
+  shareGroupId: string | null;
+  ownerId: string | null;
   /** 未知のカテゴリを作る場合の中身（列8・列19）。作るのは一番深い1件だけ */
   newCategory: NewCategory | null;
   occurredOn: string;
@@ -157,18 +159,15 @@ export function analyzeImport(text: string, context: ImportContext): ImportResul
       return error('支払者がその共有範囲のメンバーではありません');
     }
 
-    // カテゴリ。共有範囲 + 収支 + 名前で大分類を引き、小分類はその親の中で引く（§4.4）。
+    // カテゴリ。収支 + 名前で大分類を引き、小分類はその親の中で引く（§4.4）。
+    // カテゴリは全ユーザー共通なので、共有範囲では絞らない。
     // 小分類の列は無くてもよい（下位分類を入れる前に書き出したファイルのため）
     const name = normalizeCategoryName(row['カテゴリ'] ?? '');
     const subName = normalizeCategoryName(row['小分類'] ?? '');
-    const inScope = context.categories.filter(
-      (c) =>
-        (c.parentId ?? null) === null &&
-        c.shareGroupId === shareGroupId &&
-        c.ownerId === ownerId &&
-        c.kind === kind,
+    const roots = context.categories.filter(
+      (c) => (c.parentId ?? null) === null && c.kind === kind,
     );
-    const root = inScope.find((c) => c.name === name) ?? null;
+    const root = roots.find((c) => c.name === name) ?? null;
     const child =
       root === null || subName === ''
         ? null
@@ -181,12 +180,12 @@ export function analyzeImport(text: string, context: ImportContext): ImportResul
         // 一番深い未知の1件を作る。大分類ごと未知なら、まず大分類から
         newCategory =
           root === null
-            ? { shareGroupId, ownerId, kind, name, parentId: null }
-            : { shareGroupId, ownerId, kind, name: subName, parentId: root.id };
+            ? { kind, name, parentId: null }
+            : { kind, name: subName, parentId: root.id };
       } else {
-        // 未分類にするときは小分類を捨てて、その共有範囲の未分類（大分類）へ付ける
-        const fallback = inScope.find((c) => c.isSystem === true);
-        if (fallback === undefined) return error('その共有範囲の未分類カテゴリが見つかりません');
+        // 未分類にするときは小分類を捨てて、その収支区分の未分類（大分類）へ付ける
+        const fallback = roots.find((c) => c.isSystem === true);
+        if (fallback === undefined) return error('未分類カテゴリが見つかりません');
         categoryId = fallback.id;
       }
     }
@@ -217,6 +216,8 @@ export function analyzeImport(text: string, context: ImportContext): ImportResul
     const memo = row['備考'] ?? '';
     const payload: ImportPayload = {
       categoryId,
+      shareGroupId,
+      ownerId,
       newCategory,
       occurredOn,
       amount,

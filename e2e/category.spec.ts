@@ -2,6 +2,7 @@ import { test, expect } from './fixtures';
 import {
   adminClient,
   countBudgets,
+  seedBudget,
   seedCategory,
   seedGroup,
   seedTransaction,
@@ -10,24 +11,16 @@ import {
 
 async function categoryOf(name: string): Promise<{
   id: string;
-  share_group_id: string | null;
-  owner_id: string | null;
   is_archived: boolean;
   sort_order: number;
 }> {
   const { data, error } = await adminClient()
     .from('categories')
-    .select('id, share_group_id, owner_id, is_archived, sort_order')
+    .select('id, is_archived, sort_order')
     .eq('name', name)
     .single();
   if (error !== null) throw error;
-  return data as {
-    id: string;
-    share_group_id: string | null;
-    owner_id: string | null;
-    is_archived: boolean;
-    sort_order: number;
-  };
+  return data as { id: string; is_archived: boolean; sort_order: number };
 }
 
 /** 一覧の初期表示は今月なので、今日の日付で入れる */
@@ -36,38 +29,35 @@ function today(): string {
 }
 
 test.describe('カテゴリの管理', () => {
-  test('列1 共有カテゴリを作ると共有範囲つきで並ぶ', async ({ signedIn, users }) => {
-    const group = await seedGroup(users);
-
+  test('列1 カテゴリを作ると共有範囲なしの名前として並ぶ', async ({ signedIn }) => {
     await signedIn.goto('/categories');
-    await signedIn.getByLabel('共有範囲').selectOption({ label: '夫婦' });
+    // 追加フォームに共有範囲の選択は無い（カテゴリは全ユーザー共通。§2.4）
+    await expect(signedIn.getByLabel('共有範囲')).toHaveCount(0);
     await signedIn.getByLabel('カテゴリ名').fill('家賃');
     await signedIn.getByRole('button', { name: '追加' }).click();
 
     await expect(signedIn.getByLabel('家賃の名前')).toBeVisible();
-    const category = await categoryOf('家賃');
-    expect(category.share_group_id).toBe(group);
-    expect(category.owner_id).toBeNull();
 
-    // 取引の入力では共有範囲つきの名前で選べる
+    // 取引の入力では共有範囲の接頭辞なしで選べる
     await signedIn.goto('/new');
-    await expect(signedIn.getByLabel('カテゴリ')).toContainText('夫婦 / 家賃');
+    await expect(signedIn.getByLabel('カテゴリ')).toContainText('家賃');
+    const options = await signedIn.getByLabel('カテゴリ').locator('option').allTextContents();
+    expect(options.some((text) => text.includes(' / 家賃'))).toBe(false);
   });
 
-  test('列2 個人カテゴリは本人だけが見られる', async ({ signedIn, users }) => {
+  test('列2 カテゴリは作った人以外にも見える', async ({ signedIn }) => {
     await signedIn.goto('/categories');
-    await signedIn.getByLabel('共有範囲').selectOption({ label: '個人' });
     await signedIn.getByLabel('カテゴリ名').fill('趣味');
     await signedIn.getByRole('button', { name: '追加' }).click();
-
     await expect(signedIn.getByLabel('趣味の名前')).toBeVisible();
-    const category = await categoryOf('趣味');
-    expect(category.share_group_id).toBeNull();
-    expect(category.owner_id).toBe(users.taro);
+
+    // 別の利用者から見ても同じカテゴリが並ぶ
+    await signedIn.goto('/categories');
+    await expect(signedIn.getByLabel('趣味の名前')).toBeVisible();
   });
 
-  test('列7 収支区分は変えられない', async ({ signedIn, users }) => {
-    const id = await seedCategory({ ownerId: users.taro, name: '趣味', kind: 'expense' });
+  test('列7 収支区分は変えられない', async ({ signedIn }) => {
+    const id = await seedCategory({ name: '趣味', kind: 'expense' });
 
     await signedIn.goto('/categories');
     await expect(signedIn.getByLabel('趣味の名前')).toBeVisible();
@@ -80,9 +70,10 @@ test.describe('カテゴリの管理', () => {
   });
 
   test('列8 アーカイブすると候補から外れるが過去の取引は残る', async ({ signedIn, users }) => {
-    const category = await seedCategory({ ownerId: users.taro, name: '趣味' });
+    const category = await seedCategory({ name: '趣味' });
     await seedTransaction({
       categoryId: category,
+      ownerId: users.taro,
       payerId: users.taro,
       createdBy: users.taro,
       occurredOn: today(),
@@ -110,9 +101,10 @@ test.describe('カテゴリの管理', () => {
 
   test('列9 削除すると取引が未分類へ移り予算は消える', async ({ signedIn, users }) => {
     const group = await seedGroup(users);
-    const category = await seedCategory({ shareGroupId: group, name: '家賃' });
+    const category = await seedCategory({ name: '家賃' });
     const tx = await seedTransaction({
       categoryId: category,
+      shareGroupId: group,
       payerId: users.taro,
       createdBy: users.taro,
       occurredOn: today(),
@@ -122,10 +114,12 @@ test.describe('カテゴリの管理', () => {
         { userId: users.hana, amount: 300 },
       ],
     });
-    const { error } = await adminClient()
-      .from('budgets')
-      .insert({ category_id: category, month: `${today().slice(0, 7)}-01`, amount: 50000 });
-    if (error !== null) throw error;
+    await seedBudget({
+      categoryId: category,
+      shareGroupId: group,
+      month: `${today().slice(0, 7)}-01`,
+      amount: 50000,
+    });
 
     await signedIn.goto('/categories');
     await signedIn.getByRole('button', { name: '削除' }).click();
@@ -135,14 +129,16 @@ test.describe('カテゴリの管理', () => {
 
     const { data } = await adminClient()
       .from('transactions')
-      .select('category_id, categories(name, share_group_id)')
+      .select('share_group_id, categories(name)')
       .eq('id', tx)
       .single();
     const moved = data as unknown as {
-      categories: { name: string; share_group_id: string | null };
+      share_group_id: string | null;
+      categories: { name: string };
     };
+    // 未分類は全体で1件。取引の共有範囲は動かない
     expect(moved.categories.name).toBe('未分類');
-    expect(moved.categories.share_group_id).toBe(group);
+    expect(moved.share_group_id).toBe(group);
 
     // 共有範囲が変わらないので負担はそのまま
     const splits = await adminClient()
@@ -156,10 +152,9 @@ test.describe('カテゴリの管理', () => {
 
   test('列10・列11・列12 未分類は消せず改名もアーカイブもできない', async ({
     signedIn,
-    users,
   }) => {
-    const id = await systemCategoryOf(users.taro, 'expense');
-    await seedCategory({ ownerId: users.taro, name: '趣味' });
+    const id = await systemCategoryOf('expense');
+    await seedCategory({ name: '趣味' });
 
     await signedIn.goto('/categories');
     await expect(signedIn.getByText('（消せない）')).toBeVisible();
@@ -182,45 +177,76 @@ test.describe('カテゴリの管理', () => {
     expect(data).toEqual({ name: '未分類', is_archived: false });
   });
 
-  test('列13 複製先に同名があると実行前に知らせる', async ({ signedIn, users }) => {
-    const group = await seedGroup(users);
-    await seedCategory({ shareGroupId: group, name: '食費' });
-    await seedCategory({ ownerId: users.taro, name: '食費' });
+  test('列25 他の人が使っているカテゴリの改名は影響を見せて確かめる', async ({
+    signedIn,
+    users,
+  }) => {
+    const category = await seedCategory({ name: '食費' });
+    // はなこ が作った取引。たかし からは見えない個人の共有範囲に置く
+    await seedTransaction({
+      categoryId: category,
+      ownerId: users.hana,
+      payerId: users.hana,
+      createdBy: users.hana,
+      occurredOn: today(),
+      amount: 500,
+      splits: [{ userId: users.hana, amount: 500 }],
+    });
 
     await signedIn.goto('/categories');
-    await signedIn.getByLabel('食費の移動先').first().selectOption({ label: '個人へ' });
+    await signedIn.getByLabel('食費の名前').fill('食料費');
+    await signedIn.getByLabel('食費の名前').blur();
 
-    await expect(signedIn.getByRole('alert')).toContainText('統合しますか');
-    // 知らせるだけで、まだ移していない
-    const { count } = await adminClient()
-      .from('categories')
-      .select('id', { count: 'exact', head: true })
-      .eq('name', '食費')
-      .eq('share_group_id', group);
-    expect(count).toBe(1);
+    // 確認が出るまでは書き換えない
+    await expect(signedIn.getByRole('alert')).toContainText('食料費');
+    expect((await categoryOf('食費')).id).toBe(category);
+
+    await signedIn.getByRole('button', { name: '変える' }).click();
+    await expect(signedIn.getByLabel('食料費の名前')).toBeVisible();
   });
 
-  test('カテゴリの名前を変えられる', async ({ signedIn, users }) => {
-    await seedCategory({ ownerId: users.taro, name: '趣味' });
+  test('列23 他の人が使っているカテゴリは削除できずアーカイブへ誘導する', async ({
+    signedIn,
+    users,
+  }) => {
+    const category = await seedCategory({ name: '食費' });
+    await seedTransaction({
+      categoryId: category,
+      ownerId: users.hana,
+      payerId: users.hana,
+      createdBy: users.hana,
+      occurredOn: today(),
+      amount: 500,
+      splits: [{ userId: users.hana, amount: 500 }],
+    });
+
+    await signedIn.goto('/categories');
+    await signedIn.getByLabel('食費を削除').click();
+
+    await expect(signedIn.getByRole('alert')).toContainText('アーカイブ');
+    await expect(signedIn.getByLabel('食費の名前')).toBeVisible();
+  });
+
+  test('カテゴリの名前を変えられる', async ({ signedIn }) => {
+    await seedCategory({ name: '趣味' });
 
     await signedIn.goto('/categories');
     await signedIn.getByLabel('趣味の名前').fill('娯楽');
     await signedIn.getByLabel('趣味の名前').blur();
 
     await expect(signedIn.getByLabel('娯楽の名前')).toBeVisible();
-    expect((await categoryOf('娯楽')).owner_id).toBe(users.taro);
   });
 
-  test('列3 同じ共有範囲に同じ名前へは変えられない', async ({ signedIn, users }) => {
-    await seedCategory({ ownerId: users.taro, name: '趣味' });
-    await seedCategory({ ownerId: users.taro, name: '食費' });
+  test('列3 同じ収支区分に同じ名前へは変えられない', async ({ signedIn }) => {
+    await seedCategory({ name: '趣味' });
+    await seedCategory({ name: '食費' });
 
     await signedIn.goto('/categories');
     await signedIn.getByLabel('趣味の名前').fill('食費');
     await signedIn.getByLabel('趣味の名前').blur();
 
     await expect(signedIn.getByRole('alert')).toContainText('同じ名前');
-    expect((await categoryOf('趣味')).owner_id).toBe(users.taro);
+    await expect(signedIn.getByLabel('趣味の名前')).toBeVisible();
   });
 
   test('列14 表示順を変えると入力の候補も並び替わる', async ({ signedIn }) => {
@@ -251,8 +277,8 @@ test.describe('カテゴリの管理', () => {
     expect(at('食費')).toBeLessThan(at('趣味'));
     expect(at('趣味')).toBeLessThan(at('未分類'));
   });
-  test('列15 大分類の下に小分類を作れる', async ({ signedIn, users }) => {
-    const parent = await seedCategory({ ownerId: users.taro, name: '食費' });
+  test('列15 大分類の下に小分類を作れる', async ({ signedIn }) => {
+    const parent = await seedCategory({ name: '食費' });
 
     await signedIn.goto('/categories');
     await signedIn.getByLabel('親カテゴリ').selectOption({ label: '食費' });
@@ -262,27 +288,23 @@ test.describe('カテゴリの管理', () => {
     await expect(signedIn.getByLabel('外食の名前')).toBeVisible();
     const { data } = await adminClient()
       .from('categories')
-      .select('parent_id, share_group_id, owner_id, kind')
+      .select('parent_id, kind')
       .eq('name', '外食')
       .single();
-    // 共有範囲と収支区分は親から引き継ぐ
-    expect(data).toEqual({
-      parent_id: parent,
-      share_group_id: null,
-      owner_id: users.taro,
-      kind: 'expense',
-    });
+    // 引き継ぐのは収支区分だけ（共有範囲はカテゴリが持たない）
+    expect(data).toEqual({ parent_id: parent, kind: 'expense' });
 
     // 取引の入力では『大分類 / 小分類』で選べる
     await signedIn.goto('/new');
-    await expect(signedIn.getByLabel('カテゴリ')).toContainText('個人 / 食費 / 外食');
+    await expect(signedIn.getByLabel('カテゴリ')).toContainText('食費 / 外食');
   });
 
   test('列20 小分類を削除すると取引が親へ移る', async ({ signedIn, users }) => {
-    const parent = await seedCategory({ ownerId: users.taro, name: '食費' });
-    const child = await seedCategory({ ownerId: users.taro, name: '外食', parentId: parent });
+    const parent = await seedCategory({ name: '食費' });
+    const child = await seedCategory({ name: '外食', parentId: parent });
     const tx = await seedTransaction({
       categoryId: child,
+      ownerId: users.taro,
       payerId: users.taro,
       createdBy: users.taro,
       occurredOn: today(),
@@ -304,9 +326,9 @@ test.describe('カテゴリの管理', () => {
     expect((data as { category_id: string }).category_id).toBe(parent);
   });
 
-  test('列21 小分類が残っている大分類は削除できない', async ({ signedIn, users }) => {
-    const parent = await seedCategory({ ownerId: users.taro, name: '食費' });
-    await seedCategory({ ownerId: users.taro, name: '外食', parentId: parent });
+  test('列21 小分類が残っている大分類は削除できない', async ({ signedIn }) => {
+    const parent = await seedCategory({ name: '食費' });
+    await seedCategory({ name: '外食', parentId: parent });
 
     await signedIn.goto('/categories');
     await signedIn.getByLabel('食費を削除').click();
@@ -320,9 +342,9 @@ test.describe('カテゴリの管理', () => {
     expect(count).toBe(1);
   });
 
-  test('列22 親をアーカイブすると小分類も候補から外れる', async ({ signedIn, users }) => {
-    const parent = await seedCategory({ ownerId: users.taro, name: '食費' });
-    const child = await seedCategory({ ownerId: users.taro, name: '外食', parentId: parent });
+  test('列22 親をアーカイブすると小分類も候補から外れる', async ({ signedIn }) => {
+    const parent = await seedCategory({ name: '食費' });
+    const child = await seedCategory({ name: '外食', parentId: parent });
 
     await signedIn.goto('/categories');
     await signedIn.getByLabel('食費をアーカイブ').click();
@@ -342,10 +364,10 @@ test.describe('カテゴリの管理', () => {
     await expect(signedIn.getByLabel('カテゴリ')).not.toContainText('食費');
   });
 
-  test('列23 小分類は同じ親の中で並べ替わる', async ({ signedIn, users }) => {
-    const parent = await seedCategory({ ownerId: users.taro, name: '食費' });
-    await seedCategory({ ownerId: users.taro, name: '自炊', parentId: parent, sortOrder: 10 });
-    await seedCategory({ ownerId: users.taro, name: '外食', parentId: parent, sortOrder: 20 });
+  test('列23 小分類は同じ親の中で並べ替わる', async ({ signedIn }) => {
+    const parent = await seedCategory({ name: '食費' });
+    await seedCategory({ name: '自炊', parentId: parent, sortOrder: 10 });
+    await seedCategory({ name: '外食', parentId: parent, sortOrder: 20 });
 
     await signedIn.goto('/categories');
     await signedIn.getByRole('button', { name: '外食を上へ' }).click();
