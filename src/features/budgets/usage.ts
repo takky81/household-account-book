@@ -79,6 +79,49 @@ export function buildBudgetRows(input: {
     });
 }
 
+export type ScopeRef = { shareGroupId: string | null; ownerId: string | null };
+
+/** 予算の実績に使う取引。共有範囲を持つので、範囲ごとに分けて数えられる（§5.6） */
+export type BudgetTx = ScopeRef & { categoryId: string; amount: number; selfAmount: number };
+
+export type ScopedBudgetRow<S extends ScopeRef> = BudgetRow & { scope: S };
+
+function sameScope(a: ScopeRef, b: ScopeRef): boolean {
+  return a.shareGroupId === b.shareGroupId && a.ownerId === b.ownerId;
+}
+
+/**
+ * 共有範囲ごとに表を作って並べる。
+ *
+ * カテゴリは全ユーザー共通なので、同じ「食費」に共有の枠と個人の枠が並ぶ。
+ * カテゴリだけで畳むと枠が上書きし合い、実績も範囲をまたいで足し込まれるため、
+ * 範囲で絞ってから行を作る（§3.7 / §5.6）。
+ */
+export function buildBudgetRowsByScope<S extends ScopeRef>(input: {
+  scopes: S[];
+  categories: CategoryLike[];
+  budgets: (ScopeRef & { categoryId: string; amount: number })[];
+  transactions: BudgetTx[];
+}): ScopedBudgetRow<S>[] {
+  return input.scopes.flatMap((scope) => {
+    const actuals: Record<string, number> = {};
+    const selfBurden: Record<string, number> = {};
+    for (const tx of input.transactions) {
+      if (!sameScope(tx, scope)) continue;
+      actuals[tx.categoryId] = (actuals[tx.categoryId] ?? 0) + tx.amount;
+      selfBurden[tx.categoryId] = (selfBurden[tx.categoryId] ?? 0) + tx.selfAmount;
+    }
+    return buildBudgetRows({
+      categories: input.categories,
+      budgets: input.budgets
+        .filter((b) => sameScope(b, scope))
+        .map((b) => ({ categoryId: b.categoryId, amount: b.amount })),
+      actuals,
+      selfBurden,
+    }).map((row) => ({ ...row, scope }));
+  });
+}
+
 export type BudgetTotal = { budget: number; actual: number; remaining: number };
 
 /**

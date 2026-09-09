@@ -19,8 +19,8 @@ import {
   type Transaction,
 } from '../../lib/db';
 import { useAuth, useWorkspace } from '../app/context';
-import { actualsByCategory, selfBurdenByCategory } from '../app/model';
-import { budgetTotal, buildBudgetRows, copyBudgets, validateBudgetAmount } from './usage';
+import { toBudgetTx } from '../app/model';
+import { budgetTotal, buildBudgetRowsByScope, copyBudgets, validateBudgetAmount } from './usage';
 
 export function BudgetPage() {
   const workspace = useWorkspace();
@@ -63,14 +63,17 @@ export function BudgetPage() {
     item.share_group_id === scope.shareGroupId &&
     item.owner_id === scope.ownerId;
 
-  const scopedRows = rows.filter(inScope);
-  const budgetRows = buildBudgetRows({
+  const budgetRows = buildBudgetRowsByScope({
+    // 表は共有範囲1つぶん。絞り込みは行を作る側に任せる
+    scopes: scope === null ? [] : [scope],
     categories: workspace.tree,
-    budgets: budgets
-      .filter(inScope)
-      .map((b) => ({ categoryId: b.category_id, amount: b.amount })),
-    actuals: actualsByCategory(scopedRows),
-    selfBurden: selfBurdenByCategory(scopedRows, selfId),
+    budgets: budgets.map((b) => ({
+      categoryId: b.category_id,
+      shareGroupId: b.share_group_id,
+      ownerId: b.owner_id,
+      amount: b.amount,
+    })),
+    transactions: toBudgetTx(rows, selfId),
   });
   const total = budgetTotal(budgetRows);
 

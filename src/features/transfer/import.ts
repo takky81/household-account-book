@@ -15,6 +15,9 @@ import { OWN_LABEL, SHARED_LABEL } from './export';
 export type ExistingTx = {
   occurredOn: string;
   categoryId: string;
+  /** 共有範囲。カテゴリは全ユーザー共通なので、これが無いと範囲違いを同じ行と見なす */
+  shareGroupId: string | null;
+  ownerId: string | null;
   amount: number;
   payerId: string | null;
   memo: string;
@@ -232,6 +235,8 @@ export function analyzeImport(text: string, context: ImportContext): ImportResul
       (e) =>
         e.occurredOn === occurredOn &&
         e.categoryId === categoryId &&
+        e.shareGroupId === shareGroupId &&
+        e.ownerId === ownerId &&
         e.amount === amount &&
         e.payerId === payerId &&
         e.memo === memo &&

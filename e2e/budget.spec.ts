@@ -1,5 +1,12 @@
 import { test, expect } from './fixtures';
-import { adminClient, countBudgets, seedBudget, seedCategory, seedTransaction } from './db';
+import {
+  adminClient,
+  countBudgets,
+  seedBudget,
+  seedCategory,
+  seedGroup,
+  seedTransaction,
+} from './db';
 
 /** 一覧・予算の初期表示は今月なので、今日の日付で入れる */
 function today(): string {
@@ -46,6 +53,45 @@ test.describe('予算', () => {
     await signedIn.goto('/budget');
     const row = signedIn.getByRole('row').filter({ hasText: '食費' });
     await expect(row).toContainText('-2,000');
+  });
+
+  test('列14 ホームでは同じカテゴリでも共有範囲ごとに予算の行を分ける', async ({
+    signedIn,
+    users,
+  }) => {
+    // カテゴリは全ユーザー共通なので、夫婦の食費と個人の食費が同じ id を指す。
+    // 行を畳むと枠が上書きし合い、実績も範囲をまたいで足し込まれる
+    const group = await seedGroup(users);
+    const category = await seedCategory({ name: '食費' });
+    await seedBudget({ categoryId: category, ownerId: users.taro, month: thisMonth(), amount: 10000 });
+    await seedBudget({ categoryId: category, shareGroupId: group, month: thisMonth(), amount: 50000 });
+    await seedTransaction({
+      categoryId: category,
+      ownerId: users.taro,
+      payerId: users.taro,
+      createdBy: users.taro,
+      occurredOn: today(),
+      amount: 3000,
+      splits: [{ userId: users.taro, amount: 3000 }],
+    });
+    await seedTransaction({
+      categoryId: category,
+      shareGroupId: group,
+      payerId: users.taro,
+      createdBy: users.taro,
+      occurredOn: today(),
+      amount: 20000,
+      splits: [
+        { userId: users.taro, amount: 10000 },
+        { userId: users.hana, amount: 10000 },
+      ],
+    });
+
+    await signedIn.goto('/');
+    const 個人 = signedIn.getByText('3,000 / 10,000');
+    const 夫婦 = signedIn.getByText('20,000 / 50,000');
+    await expect(個人).toBeVisible();
+    await expect(夫婦).toBeVisible();
   });
 
   test('列5 収入カテゴリに予算は置けない', async ({ signedIn }) => {

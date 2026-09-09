@@ -33,6 +33,8 @@ export function ImportPage() {
         existing: existing.map((tx) => ({
           occurredOn: tx.occurred_on,
           categoryId: tx.category_id,
+          shareGroupId: tx.share_group_id,
+          ownerId: tx.owner_id,
           amount: tx.amount,
           payerId: tx.payer_id,
           memo: tx.memo,

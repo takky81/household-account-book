@@ -276,7 +276,7 @@ test.describe('取引の入力と編集', () => {
     expect((data as { category_id: string }).category_id).toBe(parent);
   });
 
-  test('列19 小分類を選ぶと共有範囲と負担は親と同じになる', async ({ signedIn, users }) => {
+  test('列19 小分類を選んでも共有範囲は変わらない', async ({ signedIn, users }) => {
     await seedGroup(users);
     const parent = await seedCategory({ name: '食費' });
     const child = await seedCategory({ name: '外食', parentId: parent });
@@ -287,7 +287,8 @@ test.describe('取引の入力と編集', () => {
       .click();
     await signedIn.getByLabel('カテゴリ').selectOption({ label: '食費 / 外食' });
     await signedIn.getByLabel('金額').fill('1000');
-    // 親と同じ共有範囲なので、夫婦の既定割合で按分される
+    // 共有範囲は取引が持つ（§2.4）。小分類を選んでも「夫婦」のままで、
+    // 負担は夫婦の既定割合で按分される
     await expect(signedIn.getByLabel('taroの負担')).toHaveValue('500');
     await expect(signedIn.getByLabel('hanaの負担')).toHaveValue('500');
     await signedIn.getByRole('button', { name: '保存', exact: true }).click();

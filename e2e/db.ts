@@ -101,7 +101,6 @@ export async function seedGroup(users: TestUsers, name = '夫婦'): Promise<stri
   return id;
 }
 
-/** カテゴリを1件作る。 */
 /**
  * 呼び出した人が入っていないグループ。参照できない共有範囲を再現するために使う。
  */

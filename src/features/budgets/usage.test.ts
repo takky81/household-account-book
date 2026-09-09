@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   applyBudget,
   buildBudgetRows,
+  buildBudgetRowsByScope,
   budgetUsage,
   copyBudgets,
   budgetTotal,
@@ -114,6 +115,47 @@ describe('buildBudgetRows（小分類）', () => {
   it('列11 合計を小分類で二重に数えない', () => {
     const total = budgetTotal(list().filter((r) => r.categoryId === 'c2'));
     expect(total.actual).toBe(62400);
+  });
+});
+
+describe('buildBudgetRowsByScope', () => {
+  // カテゴリは全ユーザー共通なので、夫婦の食費と個人の食費が同じ id を指す
+  const scopes = [
+    { key: 'own', shareGroupId: null, ownerId: 'u1', label: '個人' },
+    { key: 'g1', shareGroupId: 'g1', ownerId: null, label: '夫婦' },
+  ];
+  const list = () =>
+    buildBudgetRowsByScope({
+      scopes,
+      categories,
+      budgets: [
+        { categoryId: 'c2', shareGroupId: null, ownerId: 'u1', amount: 20000 },
+        { categoryId: 'c2', shareGroupId: 'g1', ownerId: null, amount: 55000 },
+      ],
+      transactions: [
+        { categoryId: 'c2', shareGroupId: null, ownerId: 'u1', amount: 8000, selfAmount: 8000 },
+        { categoryId: 'c2', shareGroupId: 'g1', ownerId: null, amount: 30000, selfAmount: 15000 },
+      ],
+    });
+
+  it('列14 同じカテゴリでも共有範囲が違えば予算の行を分ける', () => {
+    const 食費 = list().filter((r) => r.categoryId === 'c2');
+    expect(食費.map((r) => [r.scope.key, r.budget, r.actual])).toEqual([
+      ['own', 20000, 8000],
+      ['g1', 55000, 30000],
+    ]);
+  });
+
+  it('列14 実績と自分の負担はその共有範囲の取引だけを数える', () => {
+    const 夫婦の食費 = list().find((r) => r.scope.key === 'g1' && r.categoryId === 'c2')!;
+    expect(夫婦の食費.selfBurden).toBe(15000);
+    expect(夫婦の食費.over).toBe(false);
+  });
+
+  it('列14 予算の無い共有範囲でも実績だけの行は作る', () => {
+    const 家賃 = list().filter((r) => r.categoryId === 'c1');
+    expect(家賃).toHaveLength(2);
+    expect(家賃.every((r) => r.budget === null)).toBe(true);
   });
 });
 

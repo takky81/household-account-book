@@ -69,6 +69,8 @@ describe('analyzeImport', () => {
         {
           occurredOn: '2026-08-31',
           categoryId: 'c1',
+          shareGroupId: 'g1',
+          ownerId: null,
           amount: 1001,
           payerId: 'u1',
           memo: '',
@@ -90,6 +92,8 @@ describe('analyzeImport', () => {
         {
           occurredOn: '2026-08-31',
           categoryId: 'c1',
+          shareGroupId: 'g1',
+          ownerId: null,
           amount: 1001,
           payerId: 'u1',
           memo: '',
@@ -252,11 +256,35 @@ describe('analyzeImport（小分類）', () => {
     });
   });
 
+  it('列21 共有範囲が違えば重複にしない', () => {
+    // カテゴリは全ユーザー共通なので、カテゴリだけで比べると夫婦の1件と
+    // 個人の1件が同じ取引に見えてしまう
+    const existing = [
+      {
+        occurredOn: '2026-08-31',
+        categoryId: 'c3',
+        shareGroupId: null,
+        ownerId: 'u1',
+        amount: 780,
+        payerId: 'u1',
+        memo: '昼食',
+        splits: [{ userId: 'u1', amount: 780 }],
+      },
+    ];
+    const 同じ範囲 = run(['2026-08-31,支出,個人,食費,780,たかし,,昼食'], { existing });
+    expect(同じ範囲.counts).toMatchObject({ ok: 0, skipped: 1 });
+
+    const 違う範囲 = run(['2026-08-31,支出,夫婦,食費,780,たかし,たかし:780,昼食'], { existing });
+    expect(違う範囲.counts).toMatchObject({ ok: 1, skipped: 0 });
+  });
+
   it('列20 小分類が違えば重複にしない', () => {
     const existing = [
       {
         occurredOn: '2026-08-31',
         categoryId: 'c3',
+        shareGroupId: null,
+        ownerId: 'u1',
         amount: 780,
         payerId: 'u1',
         memo: '昼食',

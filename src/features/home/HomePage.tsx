@@ -9,8 +9,8 @@ import { formatAmount, formatSigned } from '../../lib/money';
 import { loadBudgets, loadMonthTransactions, type Budget, type Transaction } from '../../lib/db';
 import { useAuth, useWorkspace } from '../app/context';
 import { aggregateMonth, monthDiff } from '../aggregate/aggregate';
-import { actualsByCategory, selfBurdenByCategory, toAggregateTx } from '../app/model';
-import { buildBudgetRows } from '../budgets/usage';
+import { toAggregateTx, toBudgetTx } from '../app/model';
+import { buildBudgetRowsByScope } from '../budgets/usage';
 import { describeRecurringRun } from '../recurring/schedule';
 
 export function HomePage() {
@@ -60,11 +60,18 @@ export function HomePage() {
     members,
   });
 
-  const budgetRows = buildBudgetRows({
+  // ホームは共有範囲を選ばないので、範囲ごとに行を作って並べる。カテゴリだけで
+  // 畳むと、夫婦の食費の枠と個人の食費の枠が1行に潰れる（§5.6）
+  const budgetRows = buildBudgetRowsByScope({
+    scopes: workspace.scopes,
     categories: workspace.tree,
-    budgets: budgets.map((b) => ({ categoryId: b.category_id, amount: b.amount })),
-    actuals: actualsByCategory(current),
-    selfBurden: selfBurdenByCategory(current, selfId),
+    budgets: budgets.map((b) => ({
+      categoryId: b.category_id,
+      shareGroupId: b.share_group_id,
+      ownerId: b.owner_id,
+      amount: b.amount,
+    })),
+    transactions: toBudgetTx(current, selfId),
   }).filter((row) => row.budget !== null);
 
   const recent = current.slice(0, 5);
@@ -113,9 +120,16 @@ export function HomePage() {
         {budgetRows.length === 0 && <p className="text-xs text-[var(--c-muted)]">予算なし</p>}
         <div className="flex flex-col gap-2">
           {budgetRows.map((row) => (
-            <div key={row.categoryId} className="flex flex-col gap-1">
+            <div key={`${row.scope.key}|${row.categoryId}`} className="flex flex-col gap-1">
               <div className="flex items-center justify-between text-sm">
-                <span className="flex items-center gap-1">{row.name}</span>
+                <span className="flex items-center gap-1">
+                  {/* 同じカテゴリに範囲違いの枠が並ぶので、どちらの枠か印を付ける */}
+                  <ScopeTag
+                    label={row.scope.label}
+                    kind={row.scope.shareGroupId === null ? 'own' : 'group'}
+                  />
+                  {row.name}
+                </span>
                 <span className={row.over ? 'text-[var(--c-warn)]' : ''}>
                   {formatAmount(row.actual)} / {formatAmount(row.budget ?? 0)}
                 </span>

@@ -3,6 +3,7 @@
 import type { Category, Transaction } from '../../lib/db';
 import type { AggregateTx } from '../aggregate/aggregate';
 import type { TreeCategory } from '../categories/tree';
+import type { BudgetTx } from '../budgets/usage';
 import type { MoveTx } from '../scope/move';
 import type { ExportTx } from '../transfer/export';
 
@@ -85,27 +86,18 @@ export function toMoveTx(transactions: Transaction[]): MoveTx[] {
   }));
 }
 
-/** カテゴリごとの支出総額（予算の実績。§5.6） */
-export function actualsByCategory(transactions: Transaction[]): Record<string, number> {
-  const totals: Record<string, number> = {};
-  for (const tx of transactions) {
-    totals[tx.category_id] = (totals[tx.category_id] ?? 0) + tx.amount;
-  }
-  return totals;
-}
-
-/** カテゴリごとの自分の負担（参考値） */
-export function selfBurdenByCategory(
-  transactions: Transaction[],
-  selfId: string,
-): Record<string, number> {
-  const totals: Record<string, number> = {};
-  for (const tx of transactions) {
-    const mine = tx.transaction_splits.find((s) => s.user_id === selfId);
-    if (mine === undefined) continue;
-    totals[tx.category_id] = (totals[tx.category_id] ?? 0) + mine.amount;
-  }
-  return totals;
+/**
+ * 予算の実績を数える形へ（§5.6）。共有範囲を持たせるのは、カテゴリが全ユーザー共通に
+ * なり、同じカテゴリに共有の支出と個人の支出が入るようになったため。
+ */
+export function toBudgetTx(transactions: Transaction[], selfId: string): BudgetTx[] {
+  return transactions.map((tx) => ({
+    categoryId: tx.category_id,
+    shareGroupId: tx.share_group_id,
+    ownerId: tx.owner_id,
+    amount: tx.amount,
+    selfAmount: tx.transaction_splits.find((s) => s.user_id === selfId)?.amount ?? 0,
+  }));
 }
 
 /** ブラウザにファイルを渡す。 */
