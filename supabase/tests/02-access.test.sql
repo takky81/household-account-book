@@ -25,29 +25,29 @@ select public.create_share_group(
     {"user_id":"22222222-2222-2222-2222-222222222222","default_weight":1,"sort_order":20}]'::jsonb
 ) as gid;
 
-insert into public.categories (share_group_id, kind, name)
-select fx.gid, 'expense', '家賃' from fx;
+insert into public.categories (kind, name) values ('expense', 'pg-家賃');
 
 create temp table ids as
 select
-  (select c.id from public.categories c, fx where c.share_group_id = fx.gid and c.name = '家賃') as cat,
-  (select c.id from public.categories c
-    where c.owner_id = '11111111-1111-1111-1111-111111111111'
-      and c.kind = 'expense' and c.is_system) as own_cat,
-  (select c.id from public.categories c
-    where c.owner_id = '11111111-1111-1111-1111-111111111111'
-      and c.kind = 'income' and c.is_system) as own_income;
+  (select c.id from public.categories c where c.name = 'pg-家賃') as cat,
+  (select c.id from public.categories c where c.kind = 'expense' and c.is_system) as sys_cat,
+  (select c.id from public.categories c where c.kind = 'income' and c.is_system) as sys_income,
+  (select gid from fx) as gid;
 
 create temp table tx as
 select public.upsert_transaction(
-  (select cat from ids), '2026-08-31'::date, 1000,
-  '11111111-1111-1111-1111-111111111111', '8月分'
+  p_category_id => (select cat from ids),
+  p_occurred_on => '2026-08-31'::date,
+  p_amount => 1000,
+  p_payer_id => '11111111-1111-1111-1111-111111111111',
+  p_memo => '8月分',
+  p_share_group_id => (select gid from ids)
 ) as id;
 
 -- 取引の直接 INSERT。負担行の無い取引を作れてしまうため与えていない
 select throws_ok(
-  $$ insert into public.transactions (category_id, occurred_on, amount)
-     select cat, '2026-08-01', 100 from ids $$,
+  $$ insert into public.transactions (category_id, share_group_id, occurred_on, amount)
+     select cat, gid, '2026-08-01', 100 from ids $$,
   '42501', null, '取引を直接 INSERT できない'
 );
 
@@ -59,8 +59,15 @@ select throws_ok(
 
 -- カテゴリの付け替えを直接できると §5.2 の検査を迂回できる
 select throws_ok(
-  $$ update public.transactions set category_id = (select own_cat from ids) $$,
+  $$ update public.transactions set category_id = (select sys_cat from ids) $$,
   '42501', null, 'カテゴリを直接 UPDATE できない'
+);
+
+-- 共有範囲の付け替えも RPC 経由だけ。直接できると負担の作り直しを飛ばせる
+select throws_ok(
+  $$ update public.transactions set share_group_id = null,
+       owner_id = '11111111-1111-1111-1111-111111111111' $$,
+  '42501', null, '取引の共有範囲を直接 UPDATE できない'
 );
 
 -- 負担行を1行だけ消すと「合計 ≠ 金額」を作れる
@@ -73,40 +80,40 @@ select throws_ok(
   '42501', null, '負担行を直接 UPDATE できない'
 );
 
--- 共有範囲と収支区分は作成時にしか決められない
-select throws_ok(
-  $$ update public.categories set share_group_id = null $$,
-  '42501', null, 'カテゴリの共有範囲を直接 UPDATE できない'
-);
+-- 収支区分は作成時にしか決められない（カテゴリは共通なので共有範囲の列そのものが無い）
 select throws_ok(
   $$ update public.categories set kind = 'income' $$,
   '42501', null, 'カテゴリの収支区分を直接 UPDATE できない'
 );
 
--- 個人カテゴリの取引を「共用」にはできない（支払額基準の集計が崩れる）
+-- 個人の取引を「共用」にはできない（支払額基準の集計が崩れる）
 select throws_ok(
-  $$ select public.upsert_transaction((select own_cat from ids), '2026-08-31', 100, null) $$,
-  'P0001', null, '個人カテゴリの支払者を共用にできない'
+  $$ select public.upsert_transaction(
+       p_category_id => (select sys_cat from ids), p_occurred_on => '2026-08-31',
+       p_amount => 100, p_payer_id => null,
+       p_owner_id => '11111111-1111-1111-1111-111111111111') $$,
+  'P0001', null, '個人の取引の支払者を共用にできない'
 );
 
 -- 自分の個人取引に他人の負担を積めない。積めると相手からは見えないまま集計が狂う
 select throws_ok(
   $$ select public.upsert_transaction(
-       (select own_cat from ids), '2026-08-31', 100,
-       '11111111-1111-1111-1111-111111111111', '',
-       '[{"user_id":"22222222-2222-2222-2222-222222222222","amount":100}]'::jsonb) $$,
-  'P0001', null, '個人カテゴリの負担は本人だけ'
+       p_category_id => (select sys_cat from ids), p_occurred_on => '2026-08-31',
+       p_amount => 100, p_payer_id => '11111111-1111-1111-1111-111111111111',
+       p_splits => '[{"user_id":"22222222-2222-2222-2222-222222222222","amount":100}]'::jsonb,
+       p_owner_id => '11111111-1111-1111-1111-111111111111') $$,
+  'P0001', null, '個人の取引の負担は本人だけ'
 );
 
 -- 予算は月初だけ。月中の日付を入れると同じ対象月の行が複数できる
 select throws_ok(
-  $$ insert into public.budgets (category_id, month, amount)
-     select cat, '2026-08-15', 1000 from ids $$,
+  $$ insert into public.budgets (category_id, share_group_id, month, amount)
+     select cat, gid, '2026-08-15', 1000 from ids $$,
   '23514', null, '月初でない予算は入れられない'
 );
 select throws_ok(
-  $$ insert into public.budgets (category_id, month, amount)
-     select own_income, '2026-08-01', 1000 from ids $$,
+  $$ insert into public.budgets (category_id, owner_id, month, amount)
+     select sys_income, '11111111-1111-1111-1111-111111111111', '2026-08-01', 1000 from ids $$,
   'P0001', null, '収入カテゴリに予算は置けない'
 );
 
@@ -114,20 +121,16 @@ select throws_ok(
 set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
 select throws_ok(
   $$ select public.upsert_transaction(
-       (select c.id from public.categories c
-         where c.owner_id = '33333333-3333-3333-3333-333333333333'
-           and c.kind = 'expense' and c.is_system),
-       '2026-08-31', 100, '33333333-3333-3333-3333-333333333333', '',
-       null, (select id from tx)) $$,
+       p_category_id => (select sys_cat from ids), p_occurred_on => '2026-08-31',
+       p_amount => 100, p_payer_id => '33333333-3333-3333-3333-333333333333',
+       p_id => (select id from tx),
+       p_owner_id => '33333333-3333-3333-3333-333333333333') $$,
   'P0001', null, '他人の取引を自分の側へ引き寄せられない'
 );
 select throws_ok(
-  $$ select public.move_category_scope(
-       (select c.id from public.categories c
-         where c.owner_id = '33333333-3333-3333-3333-333333333333'
-           and c.kind = 'expense' and c.is_system),
-       (select gid from fx)) $$,
-  'P0001', null, '属さないグループへカテゴリを押し込めない'
+  $$ select public.move_transactions_scope(
+       array[(select id from tx)], (select gid from ids)) $$,
+  'P0001', null, '属さないグループへ取引を押し込めない'
 );
 
 -- 他人の表示名は変えられない（参照は全員に開けるが更新は本人だけ）
@@ -139,18 +142,20 @@ select is(
   'pg-taro', '他人の表示名は更新されない'
 );
 
--- profiles は全員が読めるので、参照できないカテゴリ id を既定に置けてはいけない
+-- カテゴリは共通なので誰でも既定にできる。残る検査はアーカイブ済みかどうかだけ
+update public.categories set is_archived = true where id = (select cat from ids);
 select throws_ok(
   $$ update public.profiles set default_category_id = (select cat from ids)
       where id = '33333333-3333-3333-3333-333333333333' $$,
-  'P0001', null, '参照できないカテゴリを既定にできない'
+  'P0001', null, 'アーカイブ済みのカテゴリは既定にできない'
 );
 
 -- 未ログインからは RPC を叩けない
 set local role anon;
 select throws_ok(
   $$ select public.upsert_transaction(
-       '00000000-0000-0000-0000-000000000000', '2026-08-31', 100) $$,
+       p_category_id => '00000000-0000-0000-0000-000000000000',
+       p_occurred_on => '2026-08-31', p_amount => 100) $$,
   '42501', null, 'anon は RPC を実行できない'
 );
 

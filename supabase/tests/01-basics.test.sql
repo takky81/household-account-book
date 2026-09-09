@@ -5,7 +5,7 @@ select plan(12);
 -- 決定表: 共有グループの管理 列1
 -- 決定表: 負担の按分 列1・列6
 -- 決定表: アクセス制御 列1
--- 利用者を3人作る。トリガが profiles と個人用の未分類を作る
+-- 利用者を3人作る。トリガが profiles を作る（未分類は全体で2件なので利用者ごとには作らない）
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
 values
   ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000',
@@ -27,10 +27,11 @@ select is(
   (select display_name from public.profiles where id = '11111111-1111-1111-1111-111111111111'),
   'pg-taro', '表示名の初期値はメールのローカル部'
 );
+
+-- カテゴリは全ユーザー共通。未分類は収支区分ごとに1件で、利用者を増やしても増えない
 select is(
-  (select count(*)::int from public.categories
-    where owner_id = '11111111-1111-1111-1111-111111111111' and is_system), 2,
-  '個人用の未分類が収入・支出の2件できる'
+  (select count(*)::int from public.categories where is_system), 2,
+  '未分類は全体で収入・支出の2件だけ'
 );
 
 -- 同じローカル部の2人目は連番が付く（一意制約で利用者作成ごと失敗させない）
@@ -54,19 +55,21 @@ select public.create_share_group(
 ) as gid;
 
 select is(
-  (select count(*)::int from public.categories c, fx
-    where c.share_group_id = fx.gid and c.is_system), 2,
-  'グループを作ると未分類が収入・支出の2件できる'
+  (select count(*)::int from public.share_group_members m, fx where m.share_group_id = fx.gid), 2,
+  'グループを作るとメンバーが登録される（未分類は共通なので作らない）'
 );
 
-insert into public.categories (share_group_id, kind, name, sort_order)
-select fx.gid, 'expense', '家賃', 10 from fx;
+insert into public.categories (kind, name, sort_order) values ('expense', 'pg-家賃', 10);
 
 -- 1001 円を折半すると 501 と 500。端数は重みの大きい順、同じなら sort_order 昇順
 create temp table tx as
 select public.upsert_transaction(
-  (select c.id from public.categories c, fx where c.share_group_id = fx.gid and c.name = '家賃'),
-  '2026-08-31'::date, 1001, '11111111-1111-1111-1111-111111111111', '8月分'
+  p_category_id => (select id from public.categories where name = 'pg-家賃'),
+  p_occurred_on => '2026-08-31'::date,
+  p_amount => 1001,
+  p_payer_id => '11111111-1111-1111-1111-111111111111',
+  p_memo => '8月分',
+  p_share_group_id => (select gid from fx)
 ) as id;
 
 select is(
@@ -84,17 +87,20 @@ select is(
   500, 'もう一方は 500'
 );
 
--- 個人カテゴリの取引は本人1行
+-- 個人の共有範囲の取引は本人1行。カテゴリは共通のものをそのまま使う
 create temp table ptx as
 select public.upsert_transaction(
-  (select c.id from public.categories c
-    where c.owner_id = '11111111-1111-1111-1111-111111111111' and c.kind = 'expense' and c.is_system),
-  '2026-08-31'::date, 780, '11111111-1111-1111-1111-111111111111', '昼食'
+  p_category_id => (select id from public.categories where is_system and kind = 'expense'),
+  p_occurred_on => '2026-08-31'::date,
+  p_amount => 780,
+  p_payer_id => '11111111-1111-1111-1111-111111111111',
+  p_memo => '昼食',
+  p_owner_id => '11111111-1111-1111-1111-111111111111'
 ) as id;
 
 select is(
   (select count(*)::int from public.transaction_splits s, ptx where s.transaction_id = ptx.id),
-  1, '個人カテゴリの負担は本人1行'
+  1, '個人の共有範囲の負担は本人1行'
 );
 
 -- 同じグループの hana からは見える
@@ -104,15 +110,15 @@ select is(
   '同じグループのメンバーには共有の取引が見える（個人の取引は見えない）'
 );
 
--- 属していない other からは存在ごと見えない
+-- 属していない other からは取引が見えない。ただしカテゴリは全員共通なので見える
 set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
 select is(
   (select count(*)::int from public.transactions), 0,
   '属さないグループの取引は見えない'
 );
 select is(
-  (select count(*)::int from public.categories where name = '家賃'), 0,
-  '属さないグループのカテゴリは見えない'
+  (select count(*)::int from public.categories where name = 'pg-家賃'), 1,
+  'カテゴリは全ユーザー共通なので、グループに属さない人にも見える'
 );
 
 select * from finish();
