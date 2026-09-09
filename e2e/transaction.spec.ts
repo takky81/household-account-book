@@ -252,11 +252,18 @@ test.describe('取引の入力と編集', () => {
     await signedIn.goto('/new');
     await signedIn.getByLabel('カテゴリ').selectOption({ label: '雑貨' });
     await signedIn.getByLabel('金額').fill('1200+');
-    await expect(signedIn.getByText('計算できません')).toBeVisible();
+    // 入力の途中で責めない。計算できないと出すのは保存を押してから
+    await expect(signedIn.getByText('計算できません', { exact: true })).toBeHidden();
 
     await signedIn.getByRole('button', { name: '保存', exact: true }).click();
     await expect(signedIn.getByRole('alert')).toBeVisible();
+    await expect(signedIn.getByText('計算できません', { exact: true })).toBeVisible();
     await expect(signedIn.getByRole('heading', { name: '取引を入力' })).toBeVisible();
+
+    // 直したらその場で消える
+    await signedIn.getByLabel('金額').fill('1200+300');
+    await expect(signedIn.getByText('計算できません', { exact: true })).toBeHidden();
+    await expect(signedIn.getByText('= 1,500')).toBeVisible();
   });
   test('列18 小分類を持つ大分類はそのまま選んで保存できる', async ({ signedIn }) => {
     const parent = await seedCategory({ name: '食費' });

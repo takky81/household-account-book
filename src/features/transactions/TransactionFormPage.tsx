@@ -55,6 +55,8 @@ export function TransactionFormPage() {
   /** 編集で読み込んだときの支払者。変わっていなければメンバー検査を省く（列11） */
   const [loadedPayer, setLoadedPayer] = useState<string | null>(null);
   const [error, setError] = useState('');
+  /** 保存を押したときに式が計算できなかったか。直したらすぐ消す（列17） */
+  const [amountWarned, setAmountWarned] = useState(false);
   const [saved, setSaved] = useState('');
   const [busy, setBusy] = useState(false);
   /** 続けて入力するとき、次の入力へすぐ移れるように金額へ戻す（列13） */
@@ -150,21 +152,29 @@ export function TransactionFormPage() {
   );
 
   // 式のときだけ計算結果を欄の下に出す。ただの数字なら何も出さない（列16）
+  // 計算できない間は入力の途中でもあるので、保存を押すまでは何も出さない（列17）
   const isExpression = amountText.trim() !== '' && isAmountExpression(amountText);
   const exact = isExpression ? evaluateExpression(amountText) : null;
-  const amountHint = !isExpression ? undefined : amount <= 0 || exact === null ? (
-    <span className="text-[var(--c-warn)]">計算できません</span>
+  const amountBroken = !isExpression || amount <= 0 || exact === null;
+  const amountHint = amountBroken ? (
+    amountWarned ? <span className="text-[var(--c-warn)]">計算できません</span> : undefined
   ) : (
     `= ${formatAmount(amount)}${Number.isInteger(exact) ? '' : '（四捨五入）'}`
   );
+
+  /** 金額欄を書き換える。計算できる形に直った時点で警告を消す（列17） */
+  function changeAmount(next: string) {
+    setAmountText(next);
+    setManualSplits(null);
+    if (parseAmountInput(next) !== null) setAmountWarned(false);
+  }
 
   /** 演算子をカーソル位置に入れる。入力欄の外のボタンから呼ぶ（列16） */
   function insertIntoAmount(text: string) {
     const input = amountRef.current;
     const start = input?.selectionStart ?? amountText.length;
     const end = input?.selectionEnd ?? start;
-    setAmountText(amountText.slice(0, start) + text + amountText.slice(end));
-    setManualSplits(null);
+    changeAmount(amountText.slice(0, start) + text + amountText.slice(end));
     if (input === null) return;
     input.focus();
     // 値の反映後にカーソルを入れた文字の後ろへ動かす
@@ -176,6 +186,7 @@ export function TransactionFormPage() {
     setSaved('');
     const parsed = parseAmountInput(amountText);
     if (category === null || parsed === null) {
+      if (parsed === null && isAmountExpression(amountText)) setAmountWarned(true);
       setError(
         category !== null && isAmountExpression(amountText)
           ? '金額の式を計算できません'
@@ -217,6 +228,7 @@ export function TransactionFormPage() {
       if (again) {
         // 続けて入力する。日付とカテゴリは引き継ぎ、金額と備考は空にする（列13）
         setAmountText('');
+        setAmountWarned(false);
         setMemo('');
         setManualSplits(null);
         setSaved('保存しました');
@@ -300,10 +312,7 @@ export function TransactionFormPage() {
           inputMode="numeric"
           aria-label="金額"
           value={amountText}
-          onChange={(e) => {
-            setAmountText(e.target.value);
-            setManualSplits(null);
-          }}
+          onChange={(e) => changeAmount(e.target.value)}
         />
       </Field>
 
