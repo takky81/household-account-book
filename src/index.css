@@ -25,6 +25,7 @@
   --c-line: #c2cfdf; /* 細い区切り線 */
   --c-edge: #7a8da5; /* 副ボタンの枠線 */
   --c-link: #14559c;
+  --c-overlay: rgb(19 42 69 / 0.45); /* 確認ダイアログの背面を伏せる幕 */
 
   --c-income: #0f6b5f; /* 収入 */
   --c-expense: #b42318; /* 支出・予算超過 */
@@ -59,6 +60,7 @@
   --c-line: #33455a;
   --c-edge: #5d7288;
   --c-link: #8ab8f0;
+  --c-overlay: rgb(0 0 0 / 0.6);
 
   --c-income: #5fd3bd;
   --c-expense: #ff9478;

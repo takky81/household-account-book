@@ -102,4 +102,53 @@ test.describe('表示設定と共通の振る舞い', () => {
     await expect(signedIn.getByTestId('tx-table')).toBeVisible();
     await expect(signedIn.getByTestId('tx-cards')).toHaveCount(0);
   });
+
+  test('列9 削除を押すとまず確認ダイアログが出て、その時点では消えない', async ({
+    signedIn,
+    users,
+  }) => {
+    const category = await seedCategory({ name: '食費' });
+    const occurredOn = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' });
+    await seedTransaction({
+      categoryId: category,
+      ownerId: users.taro,
+      payerId: users.taro,
+      createdBy: users.taro,
+      occurredOn,
+      amount: 780,
+      memo: '消す取引',
+      splits: [{ userId: users.taro, amount: 780 }],
+    });
+
+    await signedIn.goto('/transactions');
+    await signedIn.getByRole('button', { name: '削除' }).click();
+
+    // 端末ごとに見た目が変わる window.confirm ではなく、画面の部品として出す
+    const dialog = signedIn.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText('この取引を削除しますか');
+    await expect(signedIn.getByText('消す取引')).toBeVisible();
+    const { count } = await adminClient()
+      .from('transactions')
+      .select('id', { count: 'exact', head: true });
+    expect(count).toBe(1);
+  });
+
+  test('列10 確認をやめると消えない', async ({ signedIn }) => {
+    await seedCategory({ name: '食費' });
+
+    await signedIn.goto('/categories');
+    await signedIn.getByLabel('食費を削除').click();
+    await signedIn.getByRole('dialog').getByRole('button', { name: 'やめる' }).click();
+
+    await expect(signedIn.getByRole('dialog')).toHaveCount(0);
+    await expect(signedIn.getByLabel('食費の名前')).toBeVisible();
+
+    // Escape でも閉じる
+    await signedIn.getByLabel('食費を削除').click();
+    await expect(signedIn.getByRole('dialog')).toBeVisible();
+    await signedIn.keyboard.press('Escape');
+    await expect(signedIn.getByRole('dialog')).toHaveCount(0);
+    await expect(signedIn.getByLabel('食費の名前')).toBeVisible();
+  });
 });

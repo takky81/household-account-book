@@ -20,6 +20,7 @@
         --c-line: #c2cfdf;
         --c-edge: #7a8da5;
         --c-link: #14559c;
+        --c-overlay: rgb(19 42 69 / 0.45);
         --c-income: #0f6b5f;
         --c-expense: #b42318;
         --c-warn: #b42318;
@@ -98,6 +99,14 @@
       th, td { border: 1px solid var(--c-line); padding: 4px 6px; }
       td.num { text-align: right; font-variant-numeric: tabular-nums; }
 
+      .overlay { position: relative; background: var(--c-overlay); padding: 24px 16px; display: flex; justify-content: center; }
+      .dialog { background: var(--c-panel); border: 1px solid var(--c-line); border-radius: 8px;
+                padding: 10px; width: 260px; display: flex; flex-direction: column; gap: 8px;
+                box-shadow: 0 6px 20px rgb(0 0 0 / 0.25); }
+      .dialog > strong { font-size: 13px; }
+      /* 文言は「何が消えるか」と「そのあとどうなるか」で行を分ける */
+      .dialog .muted { text-wrap: pretty; word-break: auto-phrase; }
+      .btn.warn { background: var(--c-panel); color: var(--c-warn); border-color: var(--c-warn); }
       .note { font-size: 11px; color: var(--c-muted); border-left: 3px solid var(--c-edge);
               padding: 2px 8px; background: var(--c-panel); }
       .nav { display: flex; justify-content: space-around; border-top: 1px solid var(--c-line);
@@ -474,6 +483,42 @@
             <div class="warnbox">
               他の人が支払った取引が 5件 あるため、個人へは移せません
             </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ 削除の確認 -->
+      <section class="frame mobile">
+        <div class="caption"><span>削除の確認</span><span class="ref">§6 / 決定表「表示設定と共通の振る舞い」列9・列10</span></div>
+        <div class="body">
+          <div class="muted">
+            消す操作はすべてこの1枚を通す。背面の画面は幕で伏せる。既定の焦点は「やめる」。
+            文言は行を分けて置き、行の中の折り返しも文節で切る
+          </div>
+          <div class="overlay">
+            <div class="dialog">
+              <strong>この取引を削除しますか</strong>
+              <span class="muted">9/12 食費 / 外食 1,280円</span>
+              <span class="muted">負担もまとめて消え、元に戻せません</span>
+              <div class="row" style="justify-content: flex-end">
+                <span class="btn ghost small">やめる</span>
+                <span class="btn warn small">削除する</span>
+              </div>
+            </div>
+          </div>
+          <div class="overlay">
+            <div class="dialog">
+              <strong>「外食」を削除しますか</strong>
+              <span class="muted">取引 12 件が親の大分類へ移ります。元に戻せません</span>
+              <span class="muted">アーカイブなら記録をそのままに、新規の選択肢から外せます</span>
+              <div class="row" style="justify-content: flex-end">
+                <span class="btn ghost small">やめる</span>
+                <span class="btn warn small">削除する</span>
+              </div>
+            </div>
+          </div>
+          <div class="note">
+            消せないもの（他の人が使っているカテゴリ、最後のメンバー）は確認を出さず、その場で理由を出す
           </div>
         </div>
       </section>

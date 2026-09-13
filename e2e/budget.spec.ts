@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures';
+import { test, expect, confirmDialog } from './fixtures';
 import {
   adminClient,
   countBudgets,
@@ -175,6 +175,7 @@ test.describe('予算', () => {
 
     await signedIn.goto('/categories');
     await signedIn.getByRole('button', { name: '削除' }).click();
+    await confirmDialog(signedIn);
     await expect(signedIn.getByLabel('食費の名前')).toHaveCount(0);
 
     // 未分類には移らず、そのまま消える

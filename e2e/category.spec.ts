@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures';
+import { test, expect, confirmDialog } from './fixtures';
 import {
   adminClient,
   countBudgets,
@@ -123,6 +123,7 @@ test.describe('カテゴリの管理', () => {
 
     await signedIn.goto('/categories');
     await signedIn.getByRole('button', { name: '削除' }).click();
+    await confirmDialog(signedIn);
 
     await expect(signedIn.getByLabel('家賃の名前')).toHaveCount(0);
     expect(await countBudgets(category)).toBe(0);
@@ -315,6 +316,7 @@ test.describe('カテゴリの管理', () => {
 
     await signedIn.goto('/categories');
     await signedIn.getByLabel('外食を削除').click();
+    await confirmDialog(signedIn);
 
     await expect(signedIn.getByLabel('外食の名前')).toHaveCount(0);
     const { data } = await adminClient()
@@ -332,6 +334,7 @@ test.describe('カテゴリの管理', () => {
 
     await signedIn.goto('/categories');
     await signedIn.getByLabel('食費を削除').click();
+    await confirmDialog(signedIn);
 
     await expect(signedIn.getByRole('alert')).toContainText('小分類');
     await expect(signedIn.getByLabel('食費の名前')).toBeVisible();

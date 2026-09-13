@@ -10,7 +10,17 @@
  */
 
 import { useState } from 'react';
-import { Button, Card, ErrorText, Field, Note, Select, Tabs, TextInput } from '../../components/ui';
+import {
+  Button,
+  Card,
+  ConfirmDialog,
+  ErrorText,
+  Field,
+  Note,
+  Select,
+  Tabs,
+  TextInput,
+} from '../../components/ui';
 import {
   createCategory,
   deleteCategory,
@@ -158,6 +168,19 @@ function CategoryRow({
 /** 改名の確認。他の人が使っているカテゴリのときだけ出す */
 type RenameConfirm = { categoryId: string; from: string; to: string; usage: CategoryUsage };
 
+/** 削除の確認。消したあと取引がどこへ移るかは親を持つかで変わる（§3.4.1） */
+type RemoveConfirm = { category: Category; usage: CategoryUsage };
+
+/** 削除でこのカテゴリの取引がどこへ行くか。数と行き先を添えて確かめる（1要素=1行） */
+function removeMessage({ category, usage }: RemoveConfirm): string[] {
+  const destination = category.parent_id === null ? '同じ収支区分の未分類' : '親の大分類';
+  const moved =
+    usage.transactions === 0
+      ? 'このカテゴリを使った取引はありません'
+      : `取引 ${usage.transactions} 件が${destination}へ移ります`;
+  return [`${moved}。元に戻せません`, 'アーカイブなら記録をそのままに、新規の選択肢から外せます'];
+}
+
 export function CategoriesPage() {
   const workspace = useWorkspace();
   const [kind, setKind] = useState<Kind>('expense');
@@ -165,6 +188,7 @@ export function CategoriesPage() {
   const [parentId, setParentId] = useState<string>(ROOT);
   const [error, setError] = useState('');
   const [confirm, setConfirm] = useState<RenameConfirm | null>(null);
+  const [removing, setRemoving] = useState<RemoveConfirm | null>(null);
 
   /** 追加フォームで親に選べる大分類（未分類は親になれない。§3.4.1） */
   const parentOptions = workspace.tree.filter((c) => canBeParent(c) && c.kind === kind);
@@ -218,12 +242,16 @@ export function CategoriesPage() {
   }
 
   /**
-   * 削除。他の人の取引が黙って未分類へ移るのを止める（列23）。
+   * 削除を押したとき。他の人の取引が黙って未分類へ移るのを止める（列23）。
    * DB 側も同じ検査をするが、先に画面で件数を出してアーカイブへ誘導する。
+   * 消せるものは、影響の件数を見せて確かめてから消す（決定表「表示設定と共通の振る舞い」列9）。
    */
   async function remove(categoryId: string) {
     setError('');
     setConfirm(null);
+    setRemoving(null);
+    const category = workspace.categories.find((c) => c.id === categoryId);
+    if (category === undefined) return;
     try {
       const usage = await loadCategoryUsage(categoryId);
       if (usedByOthers(usage)) {
@@ -233,6 +261,16 @@ export function CategoriesPage() {
         );
         return;
       }
+      setRemoving({ category, usage });
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : '影響を数えられませんでした');
+    }
+  }
+
+  /** 確認を経たあとに実際に消す。小分類が残る大分類などは DB 側が止める（列21） */
+  async function applyRemove(categoryId: string) {
+    setRemoving(null);
+    try {
       await deleteCategory(categoryId);
       await workspace.reload();
     } catch (failure) {
@@ -384,6 +422,16 @@ export function CategoriesPage() {
           );
         })}
       </Card>
+
+      {removing !== null && (
+        <ConfirmDialog
+          title={`「${removing.category.name}」を削除しますか`}
+          detail={removeMessage(removing)}
+          confirmLabel="削除する"
+          onConfirm={() => void applyRemove(removing.category.id)}
+          onCancel={() => setRemoving(null)}
+        />
+      )}
 
       <Note>
         カテゴリは全員で共有します。改名も並べ替えも誰でもできますが、他の人が使っている

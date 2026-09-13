@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Button,
   Card,
+  ConfirmDialog,
   ErrorText,
   Field,
   FieldGroup,
@@ -75,6 +76,8 @@ export function RecurringPage() {
   const [form, setForm] = useState<FormState | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  /** 削除を押したルール。確認ダイアログの「削除する」で初めて消す */
+  const [pendingRemove, setPendingRemove] = useState<RecurringRule | null>(null);
 
   const reload = useCallback(async () => {
     setRules(await loadRecurringRules());
@@ -218,6 +221,7 @@ export function RecurringPage() {
 
   async function remove(rule: RecurringRule) {
     setError('');
+    setPendingRemove(null);
     try {
       await deleteRecurringRule(rule.id);
       await reload();
@@ -292,7 +296,11 @@ export function RecurringPage() {
                   >
                     {rule.is_paused ? '再開' : '一時停止'}
                   </Button>
-                  <Button variant="danger" className="text-xs" onClick={() => void remove(rule)}>
+                  <Button
+                    variant="danger"
+                    className="text-xs"
+                    onClick={() => setPendingRemove(rule)}
+                  >
                     削除
                   </Button>
                 </div>
@@ -448,6 +456,21 @@ export function RecurringPage() {
             </Button>
           </div>
         </Card>
+      )}
+
+      {pendingRemove !== null && (
+        <ConfirmDialog
+          title="この定期登録を削除しますか"
+          detail={[
+            `${workspace.categoryPath(pendingRemove.category_id)} ${formatAmount(
+              pendingRemove.amount,
+            )}（毎月${pendingRemove.day_of_month}日）`,
+            'これ以降は登録されません。すでに作られた取引は残ります',
+          ]}
+          confirmLabel="削除する"
+          onConfirm={() => void remove(pendingRemove)}
+          onCancel={() => setPendingRemove(null)}
+        />
       )}
 
       <Note>

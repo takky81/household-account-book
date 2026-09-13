@@ -74,6 +74,7 @@ const SOURCES: Record<string, string[]> = {
     'src/lib/theme.test.ts',
     'src/lib/submitGuard.test.ts',
     'src/lib/contrast.test.ts',
+    'src/components/ConfirmDialog.test.tsx',
   ],
 };
 

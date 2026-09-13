@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures';
+import { test, expect, confirmDialog } from './fixtures';
 import { adminClient, seedCategory, seedGroup, seedTransaction, systemCategoryOf } from './db';
 
 async function splitsOf(transactionId: string): Promise<{ user_id: string; amount: number }[]> {
@@ -175,6 +175,7 @@ test.describe('取引の入力と編集', () => {
     await signedIn.goto('/transactions');
     await expect(signedIn.getByText('消す取引')).toBeVisible();
     await signedIn.getByRole('button', { name: '削除' }).click();
+    await confirmDialog(signedIn);
 
     await expect(signedIn.getByText('取引がありません')).toBeVisible();
     const splits = await splitsOf(id);

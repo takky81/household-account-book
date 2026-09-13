@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures';
+import { test, expect, confirmDialog } from './fixtures';
 import { adminClient, seedCategory, seedGroup, seedTransaction } from './db';
 
 async function groupNames(): Promise<string[]> {
@@ -137,7 +137,8 @@ test.describe('共有グループの管理', () => {
     });
 
     await signedIn.goto('/groups');
-    await signedIn.getByRole('button', { name: '外す' }).nth(1).click();
+    await signedIn.getByLabel('hanaをグループから外す').click();
+    await confirmDialog(signedIn, '外す');
 
     await expect(signedIn.getByLabel('hanaの負担割合')).toHaveCount(0);
     expect(await memberIds(group)).toEqual([users.taro]);
@@ -154,8 +155,10 @@ test.describe('共有グループの管理', () => {
     if (error !== null) throw error;
 
     await signedIn.goto('/groups');
-    await signedIn.getByRole('button', { name: '外す' }).click();
+    await signedIn.getByLabel('taroをグループから外す').click();
 
+    // 外せないものは確認を出すまでもなく止める
+    await expect(signedIn.getByRole('dialog')).toHaveCount(0);
     await expect(signedIn.getByRole('alert')).toContainText('最後');
     expect(await memberIds(group)).toEqual([users.taro]);
   });
@@ -215,6 +218,7 @@ test.describe('共有グループの管理', () => {
 
     await signedIn.goto('/groups');
     await signedIn.getByRole('button', { name: 'グループを削除' }).click();
+    await confirmDialog(signedIn);
 
     await expect(signedIn.getByLabel('夫婦の名前')).toHaveCount(0);
     expect(await groupNames()).toEqual([]);
@@ -228,6 +232,7 @@ test.describe('共有グループの管理', () => {
 
     await signedIn.goto('/groups');
     await signedIn.getByRole('button', { name: 'グループを削除' }).click();
+    await confirmDialog(signedIn);
 
     await expect(signedIn.getByLabel('夫婦の名前')).toHaveCount(0);
     expect(await groupNames()).toEqual([]);
@@ -251,6 +256,7 @@ test.describe('共有グループの管理', () => {
 
     await signedIn.goto('/groups');
     await signedIn.getByRole('button', { name: 'グループを削除' }).click();
+    await confirmDialog(signedIn);
 
     await expect(signedIn.getByRole('alert')).toContainText('取引が残っている');
     expect(await groupNames()).toEqual(['夫婦']);

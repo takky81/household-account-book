@@ -1,7 +1,15 @@
 /** 共有グループ管理（決定表「共有グループの管理」）。 */
 
 import { useState } from 'react';
-import { Button, Card, ErrorText, Field, Note, TextInput } from '../../components/ui';
+import {
+  Button,
+  Card,
+  ConfirmDialog,
+  ErrorText,
+  Field,
+  Note,
+  TextInput,
+} from '../../components/ui';
 import {
   addGroupMember,
   createShareGroup,
@@ -13,6 +21,11 @@ import {
 import { useAuth, useWorkspace } from '../app/context';
 import { canAddMember, canRemoveMember, validateNewGroup } from './members';
 
+/** 確認を待っている消す操作。 */
+type Pending =
+  | { kind: 'group'; groupId: string; name: string }
+  | { kind: 'member'; groupId: string; userId: string; name: string; groupName: string };
+
 export function GroupsPage() {
   const workspace = useWorkspace();
   const { userId } = useAuth();
@@ -20,6 +33,33 @@ export function GroupsPage() {
   const [name, setName] = useState('');
   const [picked, setPicked] = useState<string[]>([selfId]);
   const [error, setError] = useState('');
+  /**
+   * 消す操作は押した時点では行わず、確認ダイアログを経る。
+   * グループごと消すのか、メンバー1人を外すのかで文面が変わる
+   */
+  const [pending, setPending] = useState<Pending | null>(null);
+
+  async function removeGroup(group: { id: string; name: string }) {
+    setPending(null);
+    setError('');
+    try {
+      await deleteShareGroup(group.id);
+      await workspace.reload();
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : '消せませんでした');
+    }
+  }
+
+  async function removeMember(groupId: string, userId: string) {
+    setPending(null);
+    setError('');
+    try {
+      await removeGroupMember(groupId, userId);
+      await workspace.reload();
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : '外せませんでした');
+    }
+  }
 
   async function create() {
     setError('');
@@ -77,15 +117,7 @@ export function GroupsPage() {
               <button
                 type="button"
                 className="text-xs text-[var(--c-warn)]"
-                onClick={async () => {
-                  setError('');
-                  try {
-                    await deleteShareGroup(group.id);
-                    await workspace.reload();
-                  } catch (failure) {
-                    setError(failure instanceof Error ? failure.message : '消せませんでした');
-                  }
-                }}
+                onClick={() => setPending({ kind: 'group', groupId: group.id, name: group.name })}
               >
                 グループを削除
               </button>
@@ -116,19 +148,22 @@ export function GroupsPage() {
                   <button
                     type="button"
                     className="text-xs"
-                    onClick={async () => {
+                    aria-label={`${workspace.displayName(member.userId)}をグループから外す`}
+                    onClick={() => {
                       setError('');
+                      // 最後の1人は外せない。確認を出す前にここで止める
                       const check = canRemoveMember(members, member.userId);
                       if (!check.ok) {
                         setError(check.message);
                         return;
                       }
-                      try {
-                        await removeGroupMember(group.id, member.userId);
-                        await workspace.reload();
-                      } catch (failure) {
-                        setError(failure instanceof Error ? failure.message : '外せませんでした');
-                      }
+                      setPending({
+                        kind: 'member',
+                        groupId: group.id,
+                        userId: member.userId,
+                        name: workspace.displayName(member.userId),
+                        groupName: group.name,
+                      });
                     }}
                   >
                     外す
@@ -203,6 +238,31 @@ export function GroupsPage() {
         </fieldset>
         <Button onClick={() => void create()}>作る</Button>
       </Card>
+
+      {pending !== null &&
+        (pending.kind === 'group' ? (
+          <ConfirmDialog
+            title={`「${pending.name}」を削除しますか`}
+            detail={[
+              'このグループで入力した取引が残っていると削除できません',
+              'メンバーと既定の負担割合の設定は消えます',
+            ]}
+            confirmLabel="削除する"
+            onConfirm={() => void removeGroup({ id: pending.groupId, name: pending.name })}
+            onCancel={() => setPending(null)}
+          />
+        ) : (
+          <ConfirmDialog
+            title={`${pending.name}を「${pending.groupName}」から外しますか`}
+            detail={[
+              'すでに入力した取引の負担は変わりません',
+              '外した人はこのグループの取引を見られなくなります',
+            ]}
+            confirmLabel="外す"
+            onConfirm={() => void removeMember(pending.groupId, pending.userId)}
+            onCancel={() => setPending(null)}
+          />
+        ))}
 
       <Note>
         負担割合を変えても、すでに入力した取引の負担は変わりません。メンバーは最後の1人を外せません

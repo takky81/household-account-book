@@ -2,7 +2,15 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Button, Card, ErrorText, ScopeTag, Tabs, TextInput } from '../../components/ui';
+import {
+  Button,
+  Card,
+  ConfirmDialog,
+  ErrorText,
+  ScopeTag,
+  Tabs,
+  TextInput,
+} from '../../components/ui';
 import { MonthNav } from '../app/Layout';
 import { currentMonthKey, formatDay } from '../../lib/date';
 import { formatAmount } from '../../lib/money';
@@ -34,6 +42,8 @@ export function TransactionsPage() {
   const [destCategoryId, setDestCategoryId] = useState('');
   /** まとめて付け替える先の共有範囲（§2.8） */
   const [destScopeKey, setDestScopeKey] = useState('');
+  /** 削除を押した取引。確認ダイアログの「削除する」で初めて消す */
+  const [pendingRemove, setPendingRemove] = useState<Transaction | null>(null);
   const [error, setError] = useState('');
 
   const reload = useMemo(
@@ -57,13 +67,13 @@ export function TransactionsPage() {
   const categoryOf = (tx: Transaction) =>
     workspace.categories.find((c) => c.id === tx.category_id)!;
 
-
   function toggle(id: string, checked: boolean) {
     setSelected(checked ? [...selected, id] : selected.filter((x) => x !== id));
   }
 
-  async function remove(id: string) {
-    await deleteTransaction(id);
+  async function remove(tx: Transaction) {
+    setPendingRemove(null);
+    await deleteTransaction(tx.id);
     await reload();
   }
 
@@ -188,7 +198,7 @@ export function TransactionsPage() {
                     <button
                       type="button"
                       className="text-[var(--c-warn)]"
-                      onClick={() => void remove(tx.id)}
+                      onClick={() => setPendingRemove(tx)}
                     >
                       削除
                     </button>
@@ -244,7 +254,7 @@ export function TransactionsPage() {
                       <button
                         type="button"
                         className="ml-2 text-[var(--c-warn)]"
-                        onClick={() => void remove(tx.id)}
+                        onClick={() => setPendingRemove(tx)}
                       >
                         削除
                       </button>
@@ -295,6 +305,21 @@ export function TransactionsPage() {
       )}
 
       <ErrorText>{error}</ErrorText>
+
+      {pendingRemove !== null && (
+        <ConfirmDialog
+          title="この取引を削除しますか"
+          detail={[
+            `${formatDay(pendingRemove.occurred_on)} ${workspace.categoryPath(
+              pendingRemove.category_id,
+            )} ${formatAmount(pendingRemove.amount)}`,
+            '負担もまとめて消え、元に戻せません',
+          ]}
+          confirmLabel="削除する"
+          onConfirm={() => void remove(pendingRemove)}
+          onCancel={() => setPendingRemove(null)}
+        />
+      )}
     </main>
   );
 }
