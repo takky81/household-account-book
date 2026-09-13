@@ -42,9 +42,12 @@ function normalizeExpression(input: string): string {
     .replace(/[,\s¥￥円]/g, '');
 }
 
-/** 演算子か括弧を含むか。含まなければただの数として読む。 */
-export function isAmountExpression(input: string): boolean {
-  return /[+\-*/()]/.test(normalizeExpression(input));
+/**
+ * 打った文字がそのまま金額にならないか。演算子・括弧・小数点のどれかを含むかで見る。
+ * true のときだけ計算結果を欄の下に出す（決定表「取引の入力と編集」列16）。
+ */
+export function isAmountComputed(input: string): boolean {
+  return /[+\-*/().]/.test(normalizeExpression(input));
 }
 
 /**
@@ -115,11 +118,11 @@ export function evaluateExpression(input: string): number | null {
 }
 
 /**
- * 金額欄の入力を読む。式なら計算して四捨五入する（金額は整数。§3）。
- * 式でなければ parseAmount と同じで、"1.5" のような小数はそのまま読めない。
+ * 金額欄の入力を読む。式でも小数でも、計算して四捨五入した整数にする（金額は整数。§3）。
+ * "1.5" のような小数をそのまま打てるのは、iPhone の数字キーボードに演算子が無く、
+ * 小数点だけは打てるため（列16）。
  */
 export function parseAmountInput(input: string): number | null {
-  if (!isAmountExpression(input)) return parseAmount(input);
   const value = evaluateExpression(input);
   if (value === null) return null;
   const rounded = Math.round(value);

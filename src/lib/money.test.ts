@@ -3,7 +3,7 @@ import {
   evaluateExpression,
   formatAmount,
   formatSigned,
-  isAmountExpression,
+  isAmountComputed,
   parseAmount,
   parseAmountInput,
 } from './money';
@@ -38,13 +38,15 @@ describe('formatAmount', () => {
   });
 });
 
-describe('isAmountExpression', () => {
-  it('演算子や括弧を含むものだけを式とみなす', () => {
-    expect(isAmountExpression('1200')).toBe(false);
-    expect(isAmountExpression('1,200')).toBe(false);
-    expect(isAmountExpression('1200+800')).toBe(true);
-    expect(isAmountExpression('1200＋800')).toBe(true);
-    expect(isAmountExpression('(1200)')).toBe(true);
+describe('isAmountComputed', () => {
+  it('演算子・括弧・小数点を含むものだけを計算とみなす', () => {
+    expect(isAmountComputed('1200')).toBe(false);
+    expect(isAmountComputed('1,200')).toBe(false);
+    expect(isAmountComputed('1200+800')).toBe(true);
+    expect(isAmountComputed('1200＋800')).toBe(true);
+    expect(isAmountComputed('(1200)')).toBe(true);
+    expect(isAmountComputed('1200.5')).toBe(true);
+    expect(isAmountComputed('1200．5')).toBe(true);
   });
 });
 
@@ -92,14 +94,25 @@ describe('parseAmountInput', () => {
     expect(parseAmountInput('1000*1.085')).toBe(1085);
   });
 
-  it('列16 式でなければ parseAmount と同じ', () => {
-    expect(parseAmountInput('1,001')).toBe(1001);
-    expect(parseAmountInput('1.5')).toBeNull();
-    expect(parseAmountInput('いくらか')).toBeNull();
+  it('列16 小数をそのまま打っても四捨五入する', () => {
+    expect(parseAmountInput('1.5')).toBe(2);
+    expect(parseAmountInput('1200.4')).toBe(1200);
+    expect(parseAmountInput('1,200.5')).toBe(1201);
   });
 
-  it('列17 計算結果が0以下になる式は読めない', () => {
+  it('列16 ただの数はそのまま読む', () => {
+    expect(parseAmountInput('1,001')).toBe(1001);
+  });
+
+  it('列17 数にも式にもならないものは読めない', () => {
+    expect(parseAmountInput('いくらか')).toBeNull();
+    expect(parseAmountInput('1.2.3')).toBeNull();
+    expect(parseAmountInput('')).toBeNull();
+  });
+
+  it('列17 計算結果が0以下になるものは読めない', () => {
     expect(parseAmountInput('500-500')).toBeNull();
     expect(parseAmountInput('500-800')).toBeNull();
+    expect(parseAmountInput('0.4')).toBeNull();
   });
 });

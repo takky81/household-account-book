@@ -247,6 +247,20 @@ test.describe('取引の入力と編集', () => {
     await expect(signedIn.getByText('= 1,260')).toBeVisible();
   });
 
+  test('列16 小数をそのまま打つと四捨五入して保存される', async ({ signedIn }) => {
+    await seedCategory({ name: '日用品' });
+
+    await signedIn.goto('/new');
+    await signedIn.getByLabel('カテゴリ').selectOption({ label: '日用品' });
+    // iPhone の数字キーボードには演算子が無いので、小数点だけで税込を打てるようにしてある
+    await signedIn.getByLabel('金額').fill('1980.5');
+    await expect(signedIn.getByText('= 1,981（四捨五入）')).toBeVisible();
+
+    await signedIn.getByRole('button', { name: '保存', exact: true }).click();
+    await expect(signedIn.getByRole('heading', { name: '取引一覧' })).toBeVisible();
+    expect((await latestTransaction()).amount).toBe(1981);
+  });
+
   test('列17 計算できない式では保存できない', async ({ signedIn }) => {
     await seedCategory({ name: '雑貨' });
 

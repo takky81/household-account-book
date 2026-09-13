@@ -12,7 +12,7 @@ import { Button, Card, ErrorText, Field, FieldGroup, Tabs, TextInput } from '../
 import {
   evaluateExpression,
   formatAmount,
-  isAmountExpression,
+  isAmountComputed,
   parseAmountInput,
 } from '../../lib/money';
 import { todayIso, weekdayOf } from '../../lib/date';
@@ -34,6 +34,7 @@ const OPERATORS = [
   { label: '÷', insert: '/' },
   { label: '(', insert: '(' },
   { label: ')', insert: ')' },
+  { label: '.', insert: '.' },
 ];
 
 export function TransactionFormPage() {
@@ -151,11 +152,11 @@ export function TransactionFormPage() {
     [workspace.tree, kind],
   );
 
-  // 式のときだけ計算結果を欄の下に出す。ただの数字なら何も出さない（列16）
+  // 式か小数のときだけ計算結果を欄の下に出す。ただの数字なら何も出さない（列16）
   // 計算できない間は入力の途中でもあるので、保存を押すまでは何も出さない（列17）
-  const isExpression = amountText.trim() !== '' && isAmountExpression(amountText);
-  const exact = isExpression ? evaluateExpression(amountText) : null;
-  const amountBroken = !isExpression || amount <= 0 || exact === null;
+  const isComputed = amountText.trim() !== '' && isAmountComputed(amountText);
+  const exact = isComputed ? evaluateExpression(amountText) : null;
+  const amountBroken = !isComputed || amount <= 0 || exact === null;
   const amountHint = amountBroken ? (
     amountWarned ? <span className="text-[var(--c-warn)]">計算できません</span> : undefined
   ) : (
@@ -186,10 +187,10 @@ export function TransactionFormPage() {
     setSaved('');
     const parsed = parseAmountInput(amountText);
     if (category === null || parsed === null) {
-      if (parsed === null && isAmountExpression(amountText)) setAmountWarned(true);
+      if (parsed === null && isAmountComputed(amountText)) setAmountWarned(true);
       setError(
-        category !== null && isAmountExpression(amountText)
-          ? '金額の式を計算できません'
+        category !== null && isAmountComputed(amountText)
+          ? '金額を計算できません'
           : 'カテゴリと金額を入れてください',
       );
       return;
@@ -309,14 +310,16 @@ export function TransactionFormPage() {
       <Field label="金額" hint={amountHint}>
         <TextInput
           ref={amountRef}
-          inputMode="numeric"
+          // iPhone の数字キーボードに小数点を出すため（列16）。演算子は下のボタンで入れる
+          inputMode="decimal"
           aria-label="金額"
           value={amountText}
           onChange={(e) => changeAmount(e.target.value)}
         />
       </Field>
 
-      {/* スマホの数字キーボードには演算子が無いので、押して入れられるようにする（列16） */}
+      {/* スマホの数字キーボードには演算子が無いので、押して入れられるようにする（列16）。
+          小数点は inputMode="decimal" でキーボードにも出るが、並びを揃えてここにも置く */}
       <div className="flex gap-1">
         {OPERATORS.map((op) => (
           <Button
