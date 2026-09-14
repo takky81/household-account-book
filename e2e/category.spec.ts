@@ -300,6 +300,28 @@ test.describe('カテゴリの管理', () => {
     await expect(signedIn.getByLabel('カテゴリ')).toContainText('食費 / 外食');
   });
 
+  test('列27 小分類を別の大分類へ付け替えられる', async ({ signedIn }) => {
+    const food = await seedCategory({ name: '食費' });
+    const party = await seedCategory({ name: '交際費' });
+    const child = await seedCategory({ name: '外食', parentId: food });
+
+    await signedIn.goto('/categories');
+    await signedIn.getByLabel('外食の親を選ぶ').selectOption({ label: '交際費' });
+    await expect(signedIn.getByText('過去のカテゴリ別集計も新しい階層で表示されます')).toBeVisible();
+    await signedIn.getByRole('button', { name: '親を変える' }).click();
+
+    await expect.poll(async () => {
+      const { data } = await adminClient()
+        .from('categories')
+        .select('parent_id')
+        .eq('id', child)
+        .single();
+      return (data as { parent_id: string }).parent_id;
+    }).toBe(party);
+    await signedIn.goto('/new');
+    await expect(signedIn.getByLabel('カテゴリ')).toContainText('交際費 / 外食');
+  });
+
   test('列20 小分類を削除すると取引が親へ移る', async ({ signedIn, users }) => {
     const parent = await seedCategory({ name: '食費' });
     const child = await seedCategory({ name: '外食', parentId: parent });

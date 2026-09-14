@@ -31,6 +31,7 @@ const SOURCES: Record<string, string[]> = {
     'src/features/categories/tree.test.ts',
     'supabase/tests/06-subcategory.test.sql',
     'supabase/tests/08-category-master.test.sql',
+    'supabase/tests/09-reparent-category.test.sql',
   ],
   取引の入力と編集: [
     'e2e/transaction.spec.ts',

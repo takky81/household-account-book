@@ -301,6 +301,18 @@ export async function updateCategory(
   if (error !== null) throw new Error(error.message);
 }
 
+/**
+ * カテゴリの親を付け替える（決定表「カテゴリの管理」列27〜列33）。
+ * 階層・予算・同名の検査と、移動先での表示順の採番をまとめて行うため RPC を通す。
+ */
+export async function reparentCategory(categoryId: string, parentId: string | null): Promise<void> {
+  const { error } = await supabase.rpc('reparent_category', {
+    p_category_id: categoryId,
+    p_parent_id: parentId,
+  });
+  if (error !== null) throw new Error(error.message);
+}
+
 export async function deleteCategory(id: string): Promise<void> {
   const { error } = await supabase.rpc('delete_category', { p_category_id: id });
   if (error !== null) throw new Error(error.message);

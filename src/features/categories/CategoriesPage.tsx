@@ -25,6 +25,7 @@ import {
   createCategory,
   deleteCategory,
   loadCategoryUsage,
+  reparentCategory,
   updateCategory,
   type Category,
   type CategoryUsage,
@@ -51,20 +52,27 @@ function usedByOthers(usage: CategoryUsage): boolean {
 }
 
 /** 改名の影響。何がどれだけ書き換わって見えるかを、数で伝える */
-function impactMessage(usage: CategoryUsage): string {
+function usageMessage(usage: CategoryUsage): string {
   const parts: string[] = [];
   if (usage.transactions > 0) parts.push(`取引 ${usage.transactions} 件`);
   if (usage.rules > 0) parts.push(`定期登録 ${usage.rules} 件`);
   if (usage.budgets > 0) parts.push(`予算 ${usage.budgets} 件`);
   const what = parts.length === 0 ? 'まだ使われていません' : parts.join(' / ');
-  return `このカテゴリは${what}。あなた以外に ${usage.others} 人が使っています。` +
-    '改名すると、その人たちの記録の見出しもまとめて変わります。';
+  return `このカテゴリは${what}。あなた以外に ${usage.others} 人が使っています。`;
+}
+
+function impactMessage(usage: CategoryUsage): string {
+  return (
+    usageMessage(usage) +
+    '改名すると、その人たちの記録の見出しもまとめて変わります。'
+  );
 }
 
 type RowActions = {
   rename: (categoryId: string, raw: string) => void;
   move: (category: Category, direction: 'up' | 'down') => void;
   remove: (categoryId: string) => void;
+  reparent: (category: Category, parentId: string | null) => void;
   update: (categoryId: string, patch: { color?: string; is_archived?: boolean }) => void;
 };
 
@@ -72,10 +80,12 @@ type RowActions = {
 function CategoryRow({
   category,
   siblings,
+  parentOptions,
   actions,
 }: {
   category: Category;
   siblings: Category[];
+  parentOptions: Category[];
   actions: RowActions;
 }) {
   const index = siblings.findIndex((c) => c.id === category.id);
@@ -144,6 +154,21 @@ function CategoryRow({
       </span>
       {!category.is_system && (
         <span className="flex shrink-0 items-center gap-1 text-xs">
+          <Select
+            aria-label={`${category.name}の親を選ぶ`}
+            className="max-w-28 py-1 text-xs"
+            value={category.parent_id ?? ROOT}
+            onChange={(e) =>
+              actions.reparent(category, e.target.value === ROOT ? null : e.target.value)
+            }
+          >
+            <option value={ROOT}>大分類</option>
+            {parentOptions.map((parent) => (
+              <option key={parent.id} value={parent.id}>
+                {parent.name}
+              </option>
+            ))}
+          </Select>
           <button
             type="button"
             aria-label={`${category.name}を${category.is_archived ? '戻す' : 'アーカイブ'}`}
@@ -168,6 +193,14 @@ function CategoryRow({
 /** 改名の確認。他の人が使っているカテゴリのときだけ出す */
 type RenameConfirm = { categoryId: string; from: string; to: string; usage: CategoryUsage };
 
+/** 親の変更確認。階層表示と過去の集計が変わるため、利用件数にかかわらず確かめる。 */
+type ReparentConfirm = {
+  category: Category;
+  parentId: string | null;
+  parentName: string | null;
+  usage: CategoryUsage;
+};
+
 /** 削除の確認。消したあと取引がどこへ移るかは親を持つかで変わる（§3.4.1） */
 type RemoveConfirm = { category: Category; usage: CategoryUsage };
 
@@ -188,10 +221,13 @@ export function CategoriesPage() {
   const [parentId, setParentId] = useState<string>(ROOT);
   const [error, setError] = useState('');
   const [confirm, setConfirm] = useState<RenameConfirm | null>(null);
+  const [reparenting, setReparenting] = useState<ReparentConfirm | null>(null);
   const [removing, setRemoving] = useState<RemoveConfirm | null>(null);
 
   /** 追加フォームで親に選べる大分類（未分類は親になれない。§3.4.1） */
-  const parentOptions = workspace.tree.filter((c) => canBeParent(c) && c.kind === kind);
+  const parentOptions = workspace.categories.filter(
+    (category) => canBeParent(toTreeCategory(category)) && category.kind === kind,
+  );
 
   /** 実際に名前を書き換える。確認を経たあともここへ来る */
   async function applyRename(categoryId: string, to: string) {
@@ -201,6 +237,50 @@ export function CategoriesPage() {
       await workspace.reload();
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : '変えられませんでした');
+    }
+  }
+
+  async function askReparent(category: Category, nextParentId: string | null) {
+    if (category.parent_id === nextParentId) return;
+    setError('');
+    setReparenting(null);
+    const parent =
+      nextParentId === null
+        ? null
+        : workspace.categories.find((candidate) => candidate.id === nextParentId);
+    if (nextParentId !== null && parent === undefined) {
+      setError('親カテゴリが見つかりません');
+      return;
+    }
+    const conflict = findNameConflict(
+      workspace.tree,
+      { kind: category.kind, name: category.name, parentId: nextParentId },
+      category.id,
+    );
+    if (conflict !== null) {
+      setError(conflictMessage(nextParentId));
+      return;
+    }
+    try {
+      const usage = await loadCategoryUsage(category.id);
+      setReparenting({
+        category,
+        parentId: nextParentId,
+        parentName: parent?.name ?? null,
+        usage,
+      });
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : '影響を数えられませんでした');
+    }
+  }
+
+  async function applyReparent(categoryId: string, nextParentId: string | null) {
+    setReparenting(null);
+    try {
+      await reparentCategory(categoryId, nextParentId);
+      await workspace.reload();
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : '親カテゴリを変えられませんでした');
     }
   }
 
@@ -331,6 +411,7 @@ export function CategoriesPage() {
     rename: (categoryId, raw) => void rename(categoryId, raw),
     move: (category, direction) => void move(category, direction),
     remove: (categoryId) => void remove(categoryId),
+    reparent: (category, nextParentId) => void askReparent(category, nextParentId),
     update: (categoryId, patch) =>
       void (async () => {
         setError('');
@@ -404,17 +485,41 @@ export function CategoriesPage() {
         </Card>
       )}
 
+      {reparenting !== null && (
+        <ConfirmDialog
+          title={`「${reparenting.category.name}」の親を変えますか`}
+          detail={[
+            reparenting.parentName === null
+              ? '大分類へ移します'
+              : `「${reparenting.parentName}」の小分類へ移します`,
+            usageMessage(reparenting.usage),
+            '過去のカテゴリ別集計も新しい階層で表示されます',
+          ]}
+          confirmLabel="親を変える"
+          onConfirm={() =>
+            void applyReparent(reparenting.category.id, reparenting.parentId)
+          }
+          onCancel={() => setReparenting(null)}
+        />
+      )}
+
       <Card className="flex flex-col gap-2">
         {tree.map(({ root, children }) => {
           const childRows = children.map((c) => c.row);
           return (
             <div key={root.id} className="flex flex-col gap-2">
-              <CategoryRow category={root.row} siblings={movable} actions={actions} />
+              <CategoryRow
+                category={root.row}
+                siblings={movable}
+                parentOptions={parentOptions.filter((candidate) => candidate.id !== root.id)}
+                actions={actions}
+              />
               {childRows.map((child) => (
                 <CategoryRow
                   key={child.id}
                   category={child}
                   siblings={childRows}
+                  parentOptions={parentOptions}
                   actions={actions}
                 />
               ))}
@@ -435,10 +540,10 @@ export function CategoriesPage() {
 
       <Note>
         カテゴリは全員で共有します。改名も並べ替えも誰でもできますが、他の人が使っている
-        カテゴリの改名は、その人たちの記録の見出しも変えるため確認します。削除は自分しか
-        使っていないときだけです。代わりにアーカイブすると、記録を残したまま新規の選択肢から
-        外せます。カテゴリは2段まで分けられ、小分類を削除するとその取引は親へ、大分類を
-        削除すると同じ収支区分の未分類へ移ります
+        カテゴリの改名や親の変更は、その人たちの記録の見出しや集計も変えるため確認します。
+        削除は自分しか使っていないときだけです。代わりにアーカイブすると、記録を残したまま
+        新規の選択肢から外せます。カテゴリは2段まで分けられ、小分類を削除するとその取引は親へ、
+        大分類を削除すると同じ収支区分の未分類へ移ります
       </Note>
     </main>
   );
