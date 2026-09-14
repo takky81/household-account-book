@@ -17,6 +17,10 @@ const NAV = [
 /** 端末下端のホームバー／ブラウザのバーと重ならないよう空ける余白。 */
 const SAFE_BOTTOM = 'max(env(safe-area-inset-bottom), 0.75rem)';
 
+/** 指で狙いやすい 44px 四方を確保し、矢印の見た目だけは小さく保つ。 */
+const MONTH_BUTTON_CLASS =
+  'inline-flex size-11 shrink-0 items-center justify-center rounded-md hover:bg-[var(--c-hover)] focus-visible:outline-2 focus-visible:outline-offset-2';
+
 export function Layout() {
   // スマートフォンでの入力を主用途とする。狭いときは親指の届く下、広いときは上に置く（列3 / §6）
   const narrow = useNarrow();
@@ -73,12 +77,22 @@ export function MonthNav({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-2 rounded-lg border border-[var(--c-line)] bg-[var(--c-panel)] px-3 py-2">
-      <button type="button" aria-label="前の月" onClick={() => onChange(addMonths(monthKey, -1))}>
+    <div className="flex items-center justify-between gap-2 rounded-lg border border-[var(--c-line)] bg-[var(--c-panel)] px-1">
+      <button
+        type="button"
+        className={MONTH_BUTTON_CLASS}
+        aria-label="前の月"
+        onClick={() => onChange(addMonths(monthKey, -1))}
+      >
         ◀
       </button>
       <strong data-testid="month">{formatMonth(monthKey)}</strong>
-      <button type="button" aria-label="次の月" onClick={() => onChange(addMonths(monthKey, 1))}>
+      <button
+        type="button"
+        className={MONTH_BUTTON_CLASS}
+        aria-label="次の月"
+        onClick={() => onChange(addMonths(monthKey, 1))}
+      >
         ▶
       </button>
       {children}

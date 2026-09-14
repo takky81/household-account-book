@@ -151,4 +151,21 @@ test.describe('表示設定と共通の振る舞い', () => {
     await expect(signedIn.getByRole('dialog')).toHaveCount(0);
     await expect(signedIn.getByLabel('食費の名前')).toBeVisible();
   });
+
+  test('列11 月移動ボタンは指で押しやすい大きさになる', async ({ signedIn }) => {
+    await signedIn.setViewportSize({ width: 375, height: 800 });
+    await signedIn.goto('/');
+
+    const previous = signedIn.getByRole('button', { name: '前の月' });
+    const next = signedIn.getByRole('button', { name: '次の月' });
+    for (const button of [previous, next]) {
+      const box = (await button.boundingBox())!;
+      expect(box.width).toBeGreaterThanOrEqual(44);
+      expect(box.height).toBeGreaterThanOrEqual(44);
+    }
+
+    const before = await signedIn.getByTestId('month').textContent();
+    await previous.click();
+    await expect(signedIn.getByTestId('month')).not.toHaveText(before!);
+  });
 });
