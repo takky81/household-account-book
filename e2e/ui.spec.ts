@@ -93,6 +93,9 @@ test.describe('表示設定と共通の振る舞い', () => {
     await expect(signedIn.getByTestId('tx-cards')).toBeVisible();
     await expect(signedIn.getByTestId('tx-table')).toHaveCount(0);
 
+    // カード内の操作要素（z-10）が下部ナビを透過して見えないよう、ナビを前面に保つ。
+    await expect(signedIn.getByTestId('nav-bottom')).toHaveCSS('z-index', '20');
+
     // 備考が1文字ずつ縦に折り返されないこと。折り返されると幅より高さが勝つ。
     const memo = signedIn.getByText('近所のスーパーでまとめ買い');
     const box = (await memo.boundingBox())!;

@@ -56,7 +56,7 @@ export function Layout() {
       {narrow && (
         <nav
           data-testid="nav-bottom"
-          className="fixed inset-x-0 bottom-0 flex justify-around border-t border-[var(--c-line)] bg-[var(--c-panel)] pt-2 text-xs"
+          className="fixed inset-x-0 bottom-0 z-20 flex justify-around border-t border-[var(--c-line)] bg-[var(--c-panel)] pt-2 text-xs"
           // 画面の最下端はブラウザのバーを呼び出す領域なので、リンクをそこまで広げない
           style={{ paddingBottom: SAFE_BOTTOM }}
         >
