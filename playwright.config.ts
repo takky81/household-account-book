@@ -16,14 +16,14 @@ export default defineConfig({
   reporter: process.env.CI ? 'github' : 'list',
   globalSetup: './e2e/global-setup.ts',
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://127.0.0.1:5173',
     trace: 'on-first-retry',
     locale: 'ja-JP',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:5173',
+    command: 'npm run dev -- --host 127.0.0.1',
+    url: 'http://127.0.0.1:5173',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },
