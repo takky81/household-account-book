@@ -431,49 +431,73 @@ export function TransactionsPage() {
 
       {/* 狭い画面では8列が横に入りきらないので、1取引=1枚のカードに積む（Layout と同じ境目）。 */}
       {narrow ? (
-        <ul className="flex flex-col gap-2" data-testid="tx-cards">
+        <ul className="flex flex-col gap-1.5" data-testid="tx-cards">
           {visible.map((tx) => {
             const category = categoryOf(tx);
+            const categoryPath = workspace.categoryPath(category.id);
             return (
               <li key={tx.id}>
-                <Card className="flex flex-col gap-1.5">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      aria-label={`${category.name} を選ぶ`}
-                      checked={selected.includes(tx.id)}
-                      onChange={(e) => toggle(tx.id, e.target.checked)}
-                    />
-                    <span className="text-sm whitespace-nowrap">{formatDay(tx.occurred_on)}</span>
+                <Card className="relative flex flex-col gap-0.5 px-3 py-2">
+                  {/* カードの余白も編集へのリンクにし、狭い画面で狙いやすくする。 */}
+                  <Link
+                    className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--c-link)]"
+                    to={`/transactions/${tx.id}/edit`}
+                    aria-label={`${categoryPath}、${formatAmount(tx.amount)}の取引を編集`}
+                  />
+
+                  {/* 表示内容はリンクを透過し、チェックとメニューだけ個別に操作できる。 */}
+                  <div className="pointer-events-none relative z-10 flex min-w-0 items-center gap-2">
+                    <label className="pointer-events-auto -m-3 flex size-11 shrink-0 items-center justify-center">
+                      <input
+                        type="checkbox"
+                        className="size-5"
+                        aria-label={`${category.name} を選ぶ`}
+                        checked={selected.includes(tx.id)}
+                        onChange={(e) => toggle(tx.id, e.target.checked)}
+                      />
+                    </label>
+                    <span className="shrink-0 text-sm whitespace-nowrap">
+                      {formatDay(tx.occurred_on)}
+                    </span>
                     <ScopeTag
                       label={workspace.scopeLabel(tx)}
                       kind={tx.share_group_id === null ? 'own' : 'group'}
                     />
-                    <span className="ml-auto text-base font-bold tabular-nums">
+                    {tx.share_group_id !== null && (
+                      <span className="min-w-0 truncate text-xs text-[var(--c-ink-soft)]">
+                        {workspace.displayName(tx.payer_id)}
+                      </span>
+                    )}
+                    <span className="ml-auto shrink-0 text-base font-bold tabular-nums">
                       {formatAmount(tx.amount)}
                     </span>
                   </div>
-                  <div className="text-sm">
-                    {workspace.categoryPath(category.id)}
-                    <span className="text-[var(--c-ink-soft)]">
-                      {' / '}
-                      {workspace.displayName(tx.payer_id)}
-                    </span>
-                  </div>
-                  {tx.memo !== '' && (
-                    <p className="text-xs break-words text-[var(--c-muted)]">{tx.memo}</p>
-                  )}
-                  <div className="flex justify-end gap-3 text-sm">
-                    <Link className="text-[var(--c-link)]" to={`/transactions/${tx.id}/edit`}>
-                      編集
-                    </Link>
-                    <button
-                      type="button"
-                      className="text-[var(--c-warn)]"
-                      onClick={() => setPendingRemove(tx)}
-                    >
-                      削除
-                    </button>
+
+                  <div className="pointer-events-none relative z-10 flex min-w-0 items-center gap-1.5 pl-7 text-sm">
+                    <span className="min-w-0 shrink truncate font-medium">{categoryPath}</span>
+                    {tx.memo !== '' && (
+                      <>
+                        <span aria-hidden="true">・</span>
+                        <span className="min-w-0 shrink truncate text-xs text-[var(--c-muted)]">
+                          {tx.memo}
+                        </span>
+                      </>
+                    )}
+                    <div className="pointer-events-auto ml-auto flex shrink-0 items-center gap-3 text-sm">
+                      <Link
+                        className="text-[var(--c-link)]"
+                        to={`/transactions/${tx.id}/edit`}
+                      >
+                        編集
+                      </Link>
+                      <button
+                        type="button"
+                        className="text-[var(--c-warn)]"
+                        onClick={() => setPendingRemove(tx)}
+                      >
+                        削除
+                      </button>
+                    </div>
                   </div>
                 </Card>
               </li>
