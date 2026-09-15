@@ -171,4 +171,39 @@ test.describe('表示設定と共通の振る舞い', () => {
     await previous.click();
     await expect(signedIn.getByTestId('month')).not.toHaveText(before!);
   });
+
+  test('列12 狭い画面のカテゴリ操作はメニューにまとまる', async ({ signedIn }) => {
+    await seedCategory({ name: '食費' });
+    await signedIn.setViewportSize({ width: 375, height: 800 });
+    await signedIn.goto('/categories');
+
+    const menuButton = signedIn.getByRole('button', { name: '食費の操作メニュー' });
+    await expect(menuButton).toBeVisible();
+    await expect(menuButton).toHaveAttribute('aria-expanded', 'false');
+    await expect(signedIn.getByLabel('食費の親を選ぶ')).toHaveCount(0);
+    await expect(signedIn.getByLabel('食費をアーカイブ')).toHaveCount(0);
+    await expect(signedIn.getByLabel('食費を削除')).toHaveCount(0);
+
+    await menuButton.click();
+    await expect(menuButton).toHaveAttribute('aria-expanded', 'true');
+    await expect(signedIn.getByText('親カテゴリを変更')).toBeVisible();
+    await expect(signedIn.getByLabel('食費の親を選ぶ')).toBeVisible();
+    await expect(signedIn.getByLabel('食費をアーカイブ')).toBeVisible();
+    await expect(signedIn.getByLabel('食費を削除')).toBeVisible();
+
+    for (const target of [menuButton, signedIn.getByLabel('食費をアーカイブ')]) {
+      const box = (await target.boundingBox())!;
+      expect(box.width).toBeGreaterThanOrEqual(44);
+      expect(box.height).toBeGreaterThanOrEqual(44);
+    }
+
+    await signedIn.keyboard.press('Escape');
+    await expect(menuButton).toHaveAttribute('aria-expanded', 'false');
+
+    await signedIn.setViewportSize({ width: 1280, height: 900 });
+    await expect(signedIn.getByRole('button', { name: '食費の操作メニュー' })).toHaveCount(0);
+    await expect(signedIn.getByLabel('食費の親を選ぶ')).toBeVisible();
+    await expect(signedIn.getByLabel('食費をアーカイブ')).toBeVisible();
+    await expect(signedIn.getByLabel('食費を削除')).toBeVisible();
+  });
 });

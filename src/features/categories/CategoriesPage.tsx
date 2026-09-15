@@ -9,7 +9,8 @@
  * カテゴリを改名するときは、影響する件数を出して保存前に確かめる。
  */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { MoreVertical } from 'lucide-react';
 import {
   Button,
   Card,
@@ -35,6 +36,7 @@ import { findNameConflict, normalizeCategoryName, validateCategoryName, type Kin
 import { nextSortOrder, reorder } from './order';
 import { canBeParent, orderedTree, siblingsOf } from './tree';
 import { toTreeCategory } from '../app/model';
+import { useNarrow } from '../../lib/useNarrow';
 
 /** 親を選ばない（大分類として作る） */
 const ROOT = '';
@@ -82,14 +84,82 @@ function CategoryRow({
   siblings,
   parentOptions,
   actions,
+  narrow,
 }: {
   category: Category;
   siblings: Category[];
   parentOptions: Category[];
   actions: RowActions;
+  narrow: boolean;
 }) {
   const index = siblings.findIndex((c) => c.id === category.id);
   const isChild = category.parent_id !== null;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+    document.addEventListener('pointerdown', closeOnOutsideClick);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [menuOpen]);
+
+  const parentSelect = (
+    <Select
+      aria-label={`${category.name}の親を選ぶ`}
+      className={narrow ? 'w-full' : 'max-w-28 py-1 text-xs'}
+      value={category.parent_id ?? ROOT}
+      onChange={(e) => {
+        setMenuOpen(false);
+        actions.reparent(category, e.target.value === ROOT ? null : e.target.value);
+      }}
+    >
+      <option value={ROOT}>大分類</option>
+      {parentOptions.map((parent) => (
+        <option key={parent.id} value={parent.id}>
+          {parent.name}
+        </option>
+      ))}
+    </Select>
+  );
+
+  const archiveButton = (
+    <button
+      type="button"
+      aria-label={`${category.name}を${category.is_archived ? '戻す' : 'アーカイブ'}`}
+      className={narrow ? 'min-h-11 w-full px-2 text-left' : undefined}
+      onClick={() => {
+        setMenuOpen(false);
+        actions.update(category.id, { is_archived: !category.is_archived });
+      }}
+    >
+      {category.is_archived ? '戻す' : 'アーカイブ'}
+    </button>
+  );
+
+  const removeButton = (
+    <button
+      type="button"
+      aria-label={`${category.name}を削除`}
+      className={`${narrow ? 'min-h-11 w-full px-2 text-left ' : ''}text-[var(--c-warn)]`}
+      onClick={() => {
+        setMenuOpen(false);
+        actions.remove(category.id);
+      }}
+    >
+      削除
+    </button>
+  );
+
   return (
     <div className={`flex items-center justify-between gap-2 ${isChild ? 'pl-4' : ''}`}>
       <span className="flex min-w-0 flex-1 items-center gap-1 text-sm">
@@ -153,38 +223,40 @@ function CategoryRow({
         )}
       </span>
       {!category.is_system && (
-        <span className="flex shrink-0 items-center gap-1 text-xs">
-          <Select
-            aria-label={`${category.name}の親を選ぶ`}
-            className="max-w-28 py-1 text-xs"
-            value={category.parent_id ?? ROOT}
-            onChange={(e) =>
-              actions.reparent(category, e.target.value === ROOT ? null : e.target.value)
-            }
-          >
-            <option value={ROOT}>大分類</option>
-            {parentOptions.map((parent) => (
-              <option key={parent.id} value={parent.id}>
-                {parent.name}
-              </option>
-            ))}
-          </Select>
-          <button
-            type="button"
-            aria-label={`${category.name}を${category.is_archived ? '戻す' : 'アーカイブ'}`}
-            onClick={() => actions.update(category.id, { is_archived: !category.is_archived })}
-          >
-            {category.is_archived ? '戻す' : 'アーカイブ'}
-          </button>
-          <button
-            type="button"
-            aria-label={`${category.name}を削除`}
-            className="text-[var(--c-warn)]"
-            onClick={() => actions.remove(category.id)}
-          >
-            削除
-          </button>
-        </span>
+        narrow ? (
+          <div className="relative shrink-0" ref={menuRef}>
+            <button
+              type="button"
+              aria-label={`${category.name}の操作メニュー`}
+              aria-expanded={menuOpen}
+              aria-controls={`${category.id}-actions`}
+              className="flex size-11 items-center justify-center rounded-md"
+              onClick={() => setMenuOpen((open) => !open)}
+            >
+              <MoreVertical aria-hidden size={20} />
+            </button>
+            {menuOpen && (
+              <div
+                id={`${category.id}-actions`}
+                className="absolute top-full right-0 z-20 flex w-52 flex-col gap-1 rounded-lg border border-[var(--c-line)] bg-[var(--c-panel)] p-2 text-sm shadow-lg"
+              >
+                <label className="flex flex-col gap-1 px-2 py-1">
+                  <span className="text-xs text-[var(--c-muted)]">親カテゴリを変更</span>
+                  {parentSelect}
+                </label>
+                <div className="border-t border-[var(--c-line)]" />
+                {archiveButton}
+                {removeButton}
+              </div>
+            )}
+          </div>
+        ) : (
+          <span className="flex shrink-0 items-center gap-1 text-xs">
+            {parentSelect}
+            {archiveButton}
+            {removeButton}
+          </span>
+        )
       )}
     </div>
   );
@@ -216,6 +288,7 @@ function removeMessage({ category, usage }: RemoveConfirm): string[] {
 
 export function CategoriesPage() {
   const workspace = useWorkspace();
+  const narrow = useNarrow();
   const [kind, setKind] = useState<Kind>('expense');
   const [name, setName] = useState('');
   const [parentId, setParentId] = useState<string>(ROOT);
@@ -513,6 +586,7 @@ export function CategoriesPage() {
                 siblings={movable}
                 parentOptions={parentOptions.filter((candidate) => candidate.id !== root.id)}
                 actions={actions}
+                narrow={narrow}
               />
               {childRows.map((child) => (
                 <CategoryRow
@@ -521,6 +595,7 @@ export function CategoriesPage() {
                   siblings={childRows}
                   parentOptions={parentOptions}
                   actions={actions}
+                  narrow={narrow}
                 />
               ))}
             </div>
