@@ -47,6 +47,10 @@ test.describe('集計', () => {
     await signedIn.getByRole('button', { name: '夫婦' }).click();
     await expect(signedIn.getByTestId('expense')).toHaveText('1,000');
 
+    // 選択中の共有範囲は上部で分かるため、カテゴリ行では繰り返さない
+    const rentRow = signedIn.getByRole('listitem').filter({ hasText: '家賃' });
+    await expect(rentRow.getByText('夫婦')).toHaveCount(0);
+
     // グループを見ているときは人別の内訳が出る
     const byUser = signedIn.getByRole('listitem').filter({ hasText: 'hana' });
     await expect(byUser).toContainText('1,000');
@@ -55,6 +59,43 @@ test.describe('集計', () => {
     await signedIn.getByRole('button', { name: '個人のみ' }).click();
     await signedIn.getByRole('button', { name: '負担額' }).click();
     await expect(signedIn.getByTestId('expense')).toHaveText('300');
+  });
+
+  test('列6 自分に関わるすべてでは個人と共通をカテゴリごとに合算する', async ({
+    signedIn,
+    users,
+  }) => {
+    const group = await seedGroup(users);
+    const food = await seedCategory({ name: '食費' });
+    await seedTransaction({
+      categoryId: food,
+      shareGroupId: group,
+      payerId: users.hana,
+      createdBy: users.taro,
+      occurredOn: today(),
+      amount: 1000,
+      splits: [
+        { userId: users.taro, amount: 500 },
+        { userId: users.hana, amount: 500 },
+      ],
+    });
+    await seedTransaction({
+      categoryId: food,
+      ownerId: users.taro,
+      payerId: users.taro,
+      createdBy: users.taro,
+      occurredOn: today(),
+      amount: 300,
+      splits: [{ userId: users.taro, amount: 300 }],
+    });
+
+    await signedIn.goto('/aggregate');
+
+    const foodRows = signedIn.getByRole('listitem').filter({ hasText: '食費' });
+    await expect(foodRows).toHaveCount(1);
+    await expect(foodRows).toContainText('800');
+    await expect(foodRows.getByText('夫婦')).toHaveCount(0);
+    await expect(foodRows.getByText('個人')).toHaveCount(0);
   });
 
   test('列11 取引のない月は内訳が空になる', async ({ signedIn }) => {

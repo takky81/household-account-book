@@ -1,7 +1,7 @@
 /** 集計画面（決定表「集計」）。対象範囲 × 集計基準の2軸で見る。 */
 
 import { useEffect, useMemo, useState } from 'react';
-import { Card, ScopeTag, Tabs } from '../../components/ui';
+import { Card, Tabs } from '../../components/ui';
 import { MonthNav } from '../app/Layout';
 import { addMonths, currentMonthKey } from '../../lib/date';
 import { formatAmount } from '../../lib/money';
@@ -148,12 +148,6 @@ export function AggregatePage() {
                         aria-hidden
                         className="size-2.5 shrink-0 rounded-full"
                         style={{ background: `var(--c-cat-${slice ?? 7})` }}
-                      />
-                      <ScopeTag
-                        label={
-                          row.shareGroupId === null ? '個人' : workspace.groupName(row.shareGroupId)
-                        }
-                        kind={row.shareGroupId === null ? 'own' : 'group'}
                       />
                       {row.name}
                       {/* 小分類の取引があるときだけ内訳を開ける（§5.4） */}

@@ -161,18 +161,24 @@ describe('aggregateMonth', () => {
     expect(result.expense).toBe(780);
   });
 
-  it('列6 同じ名前でも共有範囲が違えば別の行になる', () => {
+  it('列6 自分に関わるすべてでは同じカテゴリの個人と共通を合算する', () => {
+    const sharedFood: AggregateTx = { ...food, categoryId: 'c-food', id: 't10' };
+    const ownFood: AggregateTx = { ...lunch, categoryId: 'c-food', id: 't11' };
     const result = aggregateMonth({
-      transactions: all,
+      transactions: [sharedFood, ownFood],
       monthKey: '2026-08',
       scope: { kind: 'all' },
       basis: 'burden',
       selfId: taro,
       members,
     });
-    const food = result.byCategory.filter((r) => r.name === '食費');
-    expect(food).toHaveLength(2);
-    expect(food.map((r) => r.scopeLabel).sort()).toEqual(['individual', 'group'].sort());
+
+    expect(result.byCategory).toHaveLength(1);
+    expect(result.byCategory[0]).toMatchObject({
+      categoryId: 'c-food',
+      name: '食費',
+      amount: 2100 + 780,
+    });
   });
 
   it('列6 カテゴリ別は金額の降順に並ぶ', () => {
@@ -235,29 +241,20 @@ describe('monthDiff', () => {
     expect(monthDiff(current, previous)).toBe(124200 - 100000);
   });
 
-  it('列12 同じカテゴリでも共有範囲が違えば内訳の行を分ける', () => {
-    // カテゴリは全ユーザー共通なので、夫婦の食費と個人の食費が同じ id を指す
-    const sharedFood: AggregateTx = { ...food, categoryId: 'c-food', id: 't10' };
-    const ownFood: AggregateTx = { ...lunch, categoryId: 'c-food', id: 't11' };
+  it('列6 グループ指定でもカテゴリごとに集約する', () => {
     const result = aggregateMonth({
-      transactions: [sharedFood, ownFood],
+      transactions: [food, lunch],
       monthKey: '2026-08',
-      scope: { kind: 'all' },
+      scope: { kind: 'group', shareGroupId: 夫婦 },
       basis: 'burden',
       selfId: taro,
       members,
     });
 
-    expect(result.byCategory).toHaveLength(2);
-    const group = result.byCategory.find((r) => r.shareGroupId === 夫婦)!;
-    const own = result.byCategory.find((r) => r.shareGroupId === null)!;
-    expect(group.amount).toBe(2100);
-    expect(own.amount).toBe(780);
-    // 行の印がどちらの共有範囲を指すか決まっている
-    expect(group.scopeLabel).toBe('group');
-    expect(own.scopeLabel).toBe('individual');
-    // 円グラフの色は行ごとに引けること
-    expect(group.key).not.toBe(own.key);
+    expect(result.byCategory).toHaveLength(1);
+    expect(result.byCategory[0]).toMatchObject({
+      amount: 4200,
+    });
   });
 });
 
@@ -266,8 +263,6 @@ describe('categorySlices', () => {
     key: id,
     categoryId: id,
     name: id,
-    scopeLabel: 'individual',
-    shareGroupId: null,
     children: [],
     amount,
   });

@@ -42,18 +42,11 @@ export const NO_SUBCATEGORY = '（小分類なし）';
 export type CategoryChild = { categoryId: string; name: string; amount: number };
 
 export type CategoryTotal = {
-  /** 行の識別子。カテゴリと共有範囲の組（同じカテゴリでも範囲が違えば別の行） */
+  /** 行の識別子。カテゴリ別内訳は選択中の対象範囲内でカテゴリごとに1行 */
   key: string;
   /** 大分類の id。小分類の取引もここに畳む。円グラフの色はこれで決まる */
   categoryId: string;
   name: string;
-  /**
-   * 共有範囲。カテゴリは全ユーザー共通になったので、同じ「食費」に夫婦の支出と
-   * 個人の支出が入る。合算すると内訳がどちらの財布の話か読めなくなるため、
-   * 内訳は共有範囲ごとに分ける（§5.4）
-   */
-  scopeLabel: 'group' | 'individual';
-  shareGroupId: string | null;
   /** 配下の小分類を含んだ合計 */
   amount: number;
   /** 小分類ごとの内訳。小分類の取引が無ければ空 */
@@ -143,17 +136,14 @@ export function aggregateMonth(input: {
     if (amount !== 0 && tx.kind === 'expense') {
       // 内訳は大分類で集約する。小分類の取引は親の行に足し、内訳として持つ
       const rootId = rootIdOf({ id: tx.categoryId, parentId: tx.parentId ?? null });
-      // 共有範囲ごとに分ける。カテゴリだけで畳むと、夫婦の食費と個人の食費が
-      // 1行に混ざり、行に付く共有範囲の印がどちらを指すか決まらなくなる
-      const key = `${rootId}|${scopeKey(tx.shareGroupId, tx.ownerId)}`;
+      // 対象範囲は先に絞られている。「すべて」では財布をまたいで同じカテゴリを合算する。
+      const key = rootId;
       let row = byCategory.get(key);
       if (row === undefined) {
         row = {
           key,
           categoryId: rootId,
           name: tx.parentName ?? tx.categoryName,
-          scopeLabel: tx.shareGroupId !== null ? 'group' : 'individual',
-          shareGroupId: tx.shareGroupId,
           amount: 0,
           children: [],
         };
