@@ -101,6 +101,14 @@ test.describe('表示設定と共通の振る舞い', () => {
     const box = (await memo.boundingBox())!;
     expect(box.width).toBeGreaterThan(box.height);
 
+    // カード本体を押しただけでは編集画面へ移らず、明示的な編集リンクからだけ移る。
+    await signedIn.getByTestId('tx-cards').locator('li').first().click();
+    await expect(signedIn).toHaveURL(/\/transactions$/);
+    await signedIn.getByTestId('tx-cards').getByRole('link', { name: '編集' }).click();
+    await expect(signedIn.getByRole('heading', { name: '取引を編集' })).toBeVisible();
+
+    await signedIn.goto('/transactions');
+
     await signedIn.setViewportSize({ width: 1280, height: 900 });
     await expect(signedIn.getByTestId('tx-table')).toBeVisible();
     await expect(signedIn.getByTestId('tx-cards')).toHaveCount(0);

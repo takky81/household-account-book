@@ -458,17 +458,9 @@ export function TransactionsPage() {
             const categoryPath = workspace.categoryPath(category.id);
             return (
               <li key={tx.id}>
-                <Card className="relative flex flex-col gap-0.5 px-3 py-2">
-                  {/* カードの余白も編集へのリンクにし、狭い画面で狙いやすくする。 */}
-                  <Link
-                    className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--c-link)]"
-                    to={`/transactions/${tx.id}/edit`}
-                    aria-label={`${categoryPath}、${formatAmount(tx.amount)}の取引を編集`}
-                  />
-
-                  {/* 表示内容はリンクを透過し、チェックとメニューだけ個別に操作できる。 */}
-                  <div className="pointer-events-none relative z-10 flex min-w-0 items-center gap-2">
-                    <label className="pointer-events-auto -m-3 flex size-11 shrink-0 items-center justify-center">
+                <Card className="flex flex-col gap-0.5 px-3 py-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <label className="-m-3 flex size-11 shrink-0 items-center justify-center">
                       <input
                         type="checkbox"
                         className="size-5"
@@ -494,7 +486,7 @@ export function TransactionsPage() {
                     </span>
                   </div>
 
-                  <div className="pointer-events-none relative z-10 flex min-w-0 items-center gap-1.5 pl-7 text-sm">
+                  <div className="flex min-w-0 items-center gap-1.5 pl-7 text-sm">
                     <span className="min-w-0 shrink truncate font-medium">{categoryPath}</span>
                     {tx.memo !== '' && (
                       <>
@@ -508,7 +500,7 @@ export function TransactionsPage() {
                       const tag = workspace.tags.find((item) => item.id === tag_id);
                       return tag === undefined ? [] : [<TagBadge key={tag.id} tag={tag} />];
                     })}
-                    <div className="pointer-events-auto ml-auto flex shrink-0 items-center gap-3 text-sm">
+                    <div className="ml-auto flex shrink-0 items-center gap-3 text-sm">
                       <Link
                         className="text-[var(--c-link)]"
                         to={`/transactions/${tx.id}/edit`}
