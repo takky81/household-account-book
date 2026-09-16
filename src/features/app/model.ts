@@ -1,6 +1,6 @@
 /** DB の行を、集計・書き出し・移動の判定が使う形に直す橋渡し。 */
 
-import type { Category, Transaction } from '../../lib/db';
+import type { Category, Tag, Transaction } from '../../lib/db';
 import type { AggregateTx } from '../aggregate/aggregate';
 import type { TreeCategory } from '../categories/tree';
 import type { BudgetTx } from '../budgets/usage';
@@ -24,8 +24,13 @@ export function toTreeCategory(category: Category): TreeCategory {
   };
 }
 
-export function toAggregateTx(transactions: Transaction[], categories: Category[]): AggregateTx[] {
+export function toAggregateTx(
+  transactions: Transaction[],
+  categories: Category[],
+  tags: Tag[] = [],
+): AggregateTx[] {
   const byId = new Map(categories.map((c) => [c.id, c]));
+  const tagsById = new Map(tags.map((tag) => [tag.id, tag]));
   return transactions.flatMap((tx) => {
     const category = byId.get(tx.category_id);
     if (category === undefined) return [];
@@ -45,13 +50,22 @@ export function toAggregateTx(transactions: Transaction[], categories: Category[
         amount: tx.amount,
         payerId: tx.payer_id,
         splits: tx.transaction_splits.map((s) => ({ userId: s.user_id, amount: s.amount })),
+        tags: tx.transaction_tags.flatMap(({ tag_id }) => {
+          const tag = tagsById.get(tag_id);
+          return tag === undefined ? [] : [{ id: tag.id, name: tag.name }];
+        }),
       },
     ];
   });
 }
 
-export function toExportTx(transactions: Transaction[], categories: Category[]): ExportTx[] {
+export function toExportTx(
+  transactions: Transaction[],
+  categories: Category[],
+  tags: Tag[] = [],
+): ExportTx[] {
   const byId = new Map(categories.map((c) => [c.id, c]));
+  const tagsById = new Map(tags.map((tag) => [tag.id, tag]));
   return transactions.flatMap((tx) => {
     const category = byId.get(tx.category_id);
     if (category === undefined) return [];
@@ -67,6 +81,10 @@ export function toExportTx(transactions: Transaction[], categories: Category[]):
             ? category.name
             : (byId.get(category.parent_id)?.name ?? category.name),
         subcategoryName: category.parent_id === null ? null : category.name,
+        tagNames: tx.transaction_tags.flatMap(({ tag_id }) => {
+          const tag = tagsById.get(tag_id);
+          return tag === undefined ? [] : [tag.name];
+        }),
         amount: tx.amount,
         payerId: tx.payer_id,
         splits: tx.transaction_splits.map((s) => ({ userId: s.user_id, amount: s.amount })),

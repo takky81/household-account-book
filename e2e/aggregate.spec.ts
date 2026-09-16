@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures';
-import { seedCategory, seedGroup, seedTransaction } from './db';
+import { seedCategory, seedGroup, seedTag, seedTransaction } from './db';
 
 /** 集計の初期表示は今月なので、今日の日付で入れる */
 function today(): string {
@@ -7,6 +7,38 @@ function today(): string {
 }
 
 test.describe('集計', () => {
+  test('列14 タグを選ぶとカテゴリをまたいで対象を絞れる', async ({ signedIn, users }) => {
+    const travel = await seedTag('旅行');
+    const home = await seedTag('住まい');
+    const food = await seedCategory({ name: '食費' });
+    const transport = await seedCategory({ name: '交通費' });
+    const rent = await seedCategory({ name: '家賃' });
+    for (const [categoryId, amount, tagIds] of [
+      [food, 700, [travel]],
+      [transport, 300, [travel]],
+      [rent, 500, [home]],
+    ] as const) {
+      await seedTransaction({
+        categoryId,
+        ownerId: users.taro,
+        payerId: users.taro,
+        createdBy: users.taro,
+        occurredOn: today(),
+        amount,
+        splits: [{ userId: users.taro, amount }],
+        tagIds: [...tagIds],
+      });
+    }
+
+    await signedIn.goto('/aggregate');
+    await expect(signedIn.getByTestId('expense')).toHaveText('1,500');
+    await signedIn.getByLabel('タグ').selectOption({ label: '旅行' });
+    await expect(signedIn.getByTestId('expense')).toHaveText('1,000');
+    await expect(signedIn.getByText('食費', { exact: true })).toBeVisible();
+    await expect(signedIn.getByText('交通費', { exact: true })).toBeVisible();
+    await expect(signedIn.getByText('家賃', { exact: true })).toHaveCount(0);
+  });
+
   test('列1・列2 対象範囲と集計基準で見える金額が変わる', async ({ signedIn, users }) => {
     const group = await seedGroup(users);
     const shared = await seedCategory({ name: '家賃' });

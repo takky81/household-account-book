@@ -32,6 +32,25 @@ const run = (lines: string[], over: Partial<ImportContext> = {}) =>
   analyzeImport([header, ...lines].join('\r\n') + '\r\n', context(over));
 
 describe('analyzeImport', () => {
+  it('列22 タグ列を解決して複数タグを取り込む', () => {
+    const source = [
+      '日付,収支,共有範囲,カテゴリ,タグ,金額,支払者,負担,備考',
+      '2026-08-31,支出,個人,食費,旅行;家族,780,たかし,,昼食',
+    ].join('\r\n');
+    const result = analyzeImport(source, context({ tags: [{ id: 'tag1', name: '旅行' }, { id: 'tag2', name: '家族' }] }));
+    expect(result.entries[0]).toMatchObject({ status: 'ok', payload: { tagIds: ['tag1', 'tag2'] } });
+  });
+
+  it('列23 未知のタグは取り込まない', () => {
+    const source = [
+      '日付,収支,共有範囲,カテゴリ,タグ,金額,支払者,負担,備考',
+      '2026-08-31,支出,個人,食費,未知,780,たかし,,昼食',
+    ].join('\r\n');
+    expect(analyzeImport(source, context()).entries[0]).toMatchObject({
+      status: 'error', message: 'タグが見つかりません: 未知',
+    });
+  });
+
   it('列1 すべての列が正しければ取り込む', () => {
     const result = run(['2026-08-31,支出,夫婦,家賃,120000,共用,たかし:60000;はなこ:60000,8月分']);
     expect(result.counts).toMatchObject({ ok: 1, skipped: 0, error: 0 });

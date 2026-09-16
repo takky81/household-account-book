@@ -19,6 +19,7 @@ import { RecurringPage } from './features/recurring/RecurringPage';
 import { ImportPage } from './features/transfer/ImportPage';
 import { ExportPage } from './features/transfer/ExportPage';
 import { SettingsPage } from './features/settings/SettingsPage';
+import { TagsPage } from './features/tags/TagsPage';
 import { applyTheme, loadTheme, resolveTheme } from './lib/theme';
 import { configError } from './lib/supabase';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -51,6 +52,7 @@ function Routed() {
           <Route path="/aggregate" element={<AggregatePage />} />
           <Route path="/budget" element={<BudgetPage />} />
           <Route path="/categories" element={<CategoriesPage />} />
+          <Route path="/tags" element={<TagsPage />} />
           <Route path="/groups" element={<GroupsPage />} />
           <Route path="/recurring" element={<RecurringPage />} />
           <Route path="/import" element={<ImportPage />} />

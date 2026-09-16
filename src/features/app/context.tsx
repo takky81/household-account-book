@@ -89,7 +89,7 @@ export type WorkspaceState = Workspace & {
 
 const WorkspaceContext = createContext<WorkspaceState | null>(null);
 
-const empty: Workspace = { profiles: [], groups: [], members: [], categories: [] };
+const empty: Workspace = { profiles: [], groups: [], members: [], categories: [], tags: [] };
 
 export function WorkspaceProvider({ children, userId }: { children: ReactNode; userId: string }) {
   const [data, setData] = useState<Workspace>(empty);

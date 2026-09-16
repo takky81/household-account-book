@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures';
-import { adminClient, seedCategory, seedGroup, seedTransaction } from './db';
+import { adminClient, seedCategory, seedGroup, seedTag, seedTransaction } from './db';
 
 const HEADER = '日付,収支,共有範囲,カテゴリ,金額,支払者,負担,備考';
 
@@ -15,6 +15,32 @@ async function transactions(): Promise<
 }
 
 test.describe('CSVインポート', () => {
+  test('列22 タグ列を画面から取り込み取引へ複数タグを付ける', async ({ signedIn }) => {
+    await seedCategory({ name: '交通費' });
+    const travel = await seedTag('旅行');
+    const family = await seedTag('家族');
+    const taggedHeader = '日付,収支,共有範囲,カテゴリ,タグ,金額,支払者,負担,備考';
+
+    await signedIn.goto('/import');
+    await signedIn
+      .getByLabel('CSV の中身')
+      .fill([
+        taggedHeader,
+        '2026-09-01,支出,個人,交通費,旅行;家族,1200,taro,,移動',
+      ].join('\n'));
+    await signedIn.getByRole('button', { name: '内容を確かめる' }).click();
+    await expect(signedIn.getByTestId('import-summary')).toContainText('成功 1');
+    await signedIn.getByRole('button', { name: '1件を取り込む' }).click();
+    await expect(signedIn.getByText('1件を取り込みました')).toBeVisible();
+
+    const { data, error } = await adminClient()
+      .from('transaction_tags')
+      .select('tag_id, transactions!inner(memo)')
+      .eq('transactions.memo', '移動');
+    if (error !== null) throw error;
+    expect(data.map((row) => row.tag_id).sort()).toEqual([family, travel].sort());
+  });
+
   test('列1・列2 負担の有無にかかわらず取り込める', async ({ signedIn, users }) => {
     await seedGroup(users);
     await seedCategory({ name: '家賃' });

@@ -44,7 +44,7 @@ export function HomePage() {
   }, [workspace]);
 
   const totals = aggregateMonth({
-    transactions: toAggregateTx(current, workspace.categories),
+    transactions: toAggregateTx(current, workspace.categories, workspace.tags),
     monthKey,
     scope: { kind: 'all' },
     basis: 'burden',
@@ -52,7 +52,7 @@ export function HomePage() {
     members,
   });
   const previousTotals = aggregateMonth({
-    transactions: toAggregateTx(previous, workspace.categories),
+    transactions: toAggregateTx(previous, workspace.categories, workspace.tags),
     monthKey: addMonths(monthKey, -1),
     scope: { kind: 'all' },
     basis: 'burden',

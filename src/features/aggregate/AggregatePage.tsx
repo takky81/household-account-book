@@ -1,7 +1,7 @@
 /** 集計画面（決定表「集計」）。対象範囲 × 集計基準の2軸で見る。 */
 
 import { useEffect, useMemo, useState } from 'react';
-import { Card, Tabs } from '../../components/ui';
+import { Card, Select, Tabs } from '../../components/ui';
 import { MonthNav } from '../app/Layout';
 import { addMonths, currentMonthKey } from '../../lib/date';
 import { formatAmount } from '../../lib/money';
@@ -28,6 +28,7 @@ export function AggregatePage() {
   const [monthKey, setMonthKey] = useState(currentMonthKey());
   const [scopeValue, setScopeValue] = useState<'all' | 'own' | string>('all');
   const [basis, setBasis] = useState<Basis>('burden');
+  const [tagId, setTagId] = useState('');
   /** 内訳を開いている大分類（§5.4） */
   const [expanded, setExpanded] = useState<string[]>([]);
   const toggleExpanded = (categoryId: string) =>
@@ -63,11 +64,12 @@ export function AggregatePage() {
   // 内訳の開け閉てのたびに数え直さない（8か月ぶんの集計になる）
   const { totals, previous, history } = useMemo(() => {
     const common = {
-      transactions: toAggregateTx(rows, workspace.categories),
+      transactions: toAggregateTx(rows, workspace.categories, workspace.tags),
       scope,
       basis,
       selfId,
       members,
+      tagId: tagId === '' ? null : tagId,
     };
     return {
       totals: aggregateMonth({ ...common, monthKey }),
@@ -78,7 +80,7 @@ export function AggregatePage() {
       }),
     };
     // scope は毎回作り直されるオブジェクトなので、中身で見る
-  }, [rows, workspace.categories, scopeValue, basis, selfId, members, monthKey]);
+  }, [rows, workspace.categories, workspace.tags, scopeValue, basis, tagId, selfId, members, monthKey]);
 
   const slices = categorySlices(totals.byCategory);
   const colorOf = new Map(slices.map((slice) => [slice.key, slice.colorIndex]));
@@ -111,6 +113,16 @@ export function AggregatePage() {
         />
       </div>
 
+      <label className="flex items-center gap-2 text-sm">
+        <span>タグ</span>
+        <Select value={tagId} onChange={(event) => setTagId(event.target.value)}>
+          <option value="">すべて</option>
+          {workspace.tags.map((tag) => (
+            <option key={tag.id} value={tag.id}>{tag.name}</option>
+          ))}
+        </Select>
+      </label>
+
       <Card>
         <div className="flex justify-between text-sm">
           <span>収入</span>
@@ -126,6 +138,31 @@ export function AggregatePage() {
         </div>
         <p className="mt-1 text-xs text-[var(--c-muted)]">
           前月比 {formatAmount(monthDiff(totals, previous))}
+        </p>
+      </Card>
+
+      <Card>
+        <h2 className="mb-2 text-sm font-bold">タグ別の内訳</h2>
+        {totals.byTag.length === 0 ? (
+          <p className="text-xs text-[var(--c-muted)]">タグ付きの支出はありません</p>
+        ) : (
+          <ul className="flex flex-col gap-1">
+            {totals.byTag.map((row) => {
+              const tag = workspace.tags.find((item) => item.id === row.tagId);
+              return (
+                <li key={row.tagId} className="flex justify-between text-sm">
+                  <span className="flex items-center gap-1">
+                    <span className="size-2.5 rounded-full" style={{ background: tag?.color }} />
+                    {row.name}
+                  </span>
+                  <span className="tabular-nums">{formatAmount(row.amount)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <p className="mt-2 text-xs text-[var(--c-muted)]">
+          複数タグの取引はそれぞれに全額を数えるため、タグ別金額は合計できません
         </p>
       </Card>
 

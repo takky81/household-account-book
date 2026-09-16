@@ -20,6 +20,7 @@ const tx: Transaction = {
   owner_id: 'u1',
   splits_are_manual: false,
   transaction_splits: [],
+  transaction_tags: [],
 };
 
 function matches(keyword: string, filters: Partial<TransactionFilters> = {}, target = tx) {
@@ -28,6 +29,7 @@ function matches(keyword: string, filters: Partial<TransactionFilters> = {}, tar
     filters: { ...emptyTransactionFilters, ...filters },
     categoryPath: () => '食費 / 食料品',
     payerName: (id) => (id === null ? '共用' : 'たかし'),
+    tagName: () => '',
   });
 }
 
@@ -37,6 +39,19 @@ describe('取引一覧の絞り込み', () => {
     expect(matches('スーパー')).toBe(true);
     expect(matches('たかし')).toBe(true);
     expect(matches('はなこ')).toBe(false);
+  });
+
+  it('列20 タグ名の検索とタグ条件で絞れる', () => {
+    const tagged = { ...tx, transaction_tags: [{ tag_id: 'travel' }] };
+    expect(matchesTransaction(tagged, {
+      keyword: '旅行',
+      filters: emptyTransactionFilters,
+      categoryPath: () => '交通費',
+      payerName: () => 'たかし',
+      tagName: (id) => id === 'travel' ? '旅行' : '',
+    })).toBe(true);
+    expect(matches('', { tagId: 'travel' }, tagged)).toBe(true);
+    expect(matches('', { tagId: 'home' }, tagged)).toBe(false);
   });
 
   it('開始日と終了日を含む範囲で絞る', () => {

@@ -36,8 +36,10 @@ const SOURCES: Record<string, string[]> = {
   取引の入力と編集: [
     'e2e/transaction.spec.ts',
     'src/features/transactions/validation.test.ts',
+    'src/features/transactions/filter.test.ts',
     'src/lib/money.test.ts',
     'supabase/tests/02-access.test.sql',
+    'supabase/tests/10-tags.test.sql',
   ],
   負担の按分: ['src/lib/split.test.ts', 'e2e/transaction.spec.ts', 'supabase/tests/01-basics.test.sql'],
   共有範囲の変更: [
@@ -64,12 +66,15 @@ const SOURCES: Record<string, string[]> = {
     'e2e/recurring.spec.ts',
     'src/features/recurring/validation.test.ts',
     'supabase/tests/07-recurring.test.sql',
+    'supabase/tests/10-tags.test.sql',
   ],
   定期登録の生成: [
     'e2e/recurring.spec.ts',
     'src/features/recurring/schedule.test.ts',
     'supabase/tests/07-recurring.test.sql',
+    'supabase/tests/10-tags.test.sql',
   ],
+  タグの管理: ['e2e/tag.spec.ts', 'supabase/tests/10-tags.test.sql'],
   表示設定と共通の振る舞い: [
     'e2e/ui.spec.ts',
     'src/lib/theme.test.ts',

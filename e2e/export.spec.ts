@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { test, expect, type Page } from './fixtures';
-import { seedCategory, seedGroup, seedTransaction } from './db';
+import { seedCategory, seedGroup, seedTag, seedTransaction } from './db';
 
 /** 書き出しボタンを押して、落ちてきたファイルの中身を返す。 */
 async function downloadCsv(page: Page): Promise<string> {
@@ -14,6 +14,7 @@ test.describe('CSVエクスポート', () => {
   test('列1・列3・列5 取引を書き出すと負担と共用払いが出る', async ({ signedIn, users }) => {
     const group = await seedGroup(users);
     const category = await seedCategory({ name: '家賃' });
+    const tag = await seedTag('旅行');
     await seedTransaction({
       categoryId: category,
       shareGroupId: group,
@@ -26,6 +27,7 @@ test.describe('CSVエクスポート', () => {
         { userId: users.taro, amount: 500 },
         { userId: users.hana, amount: 500 },
       ],
+      tagIds: [tag],
     });
 
     await signedIn.goto('/export');
@@ -33,9 +35,9 @@ test.describe('CSVエクスポート', () => {
 
     expect(text.startsWith('﻿')).toBe(true);
     expect(text).toContain('\r\n');
-    expect(text).toContain('日付,収支,共有範囲,カテゴリ,小分類,金額,支払者,負担,備考');
+    expect(text).toContain('日付,収支,共有範囲,カテゴリ,小分類,タグ,金額,支払者,負担,備考');
     // 負担は表示名の順に並ぶ（読み込んだ順は決まらない）。小分類の無い取引は空欄
-    expect(text).toContain('2026-09-01,支出,夫婦,家賃,,1000,共用,hana:500;taro:500,九月分');
+    expect(text).toContain('2026-09-01,支出,夫婦,家賃,,旅行,1000,共用,hana:500;taro:500,九月分');
   });
 
   test('列9 カテゴリの書き出しでは期間を選べない', async ({ signedIn, users }) => {
@@ -54,7 +56,7 @@ test.describe('CSVエクスポート', () => {
     const text = await downloadCsv(signedIn);
 
     expect(text.replace('﻿', '').trim()).toBe(
-      '日付,収支,共有範囲,カテゴリ,小分類,金額,支払者,負担,備考',
+      '日付,収支,共有範囲,カテゴリ,小分類,タグ,金額,支払者,負担,備考',
     );
   });
   test('列11・列12 小分類の列が出る', async ({ signedIn, users }) => {
@@ -73,8 +75,8 @@ test.describe('CSVエクスポート', () => {
 
     await signedIn.goto('/export');
     const transactions = await downloadCsv(signedIn);
-    expect(transactions).toContain('日付,収支,共有範囲,カテゴリ,小分類,金額,支払者,負担,備考');
-    expect(transactions).toContain('2026-09-01,支出,個人,食費,外食,780,taro,taro:780,昼食');
+    expect(transactions).toContain('日付,収支,共有範囲,カテゴリ,小分類,タグ,金額,支払者,負担,備考');
+    expect(transactions).toContain('2026-09-01,支出,個人,食費,外食,,780,taro,taro:780,昼食');
 
     await signedIn.getByRole('button', { name: 'カテゴリ', exact: true }).click();
     const categories = await downloadCsv(signedIn);

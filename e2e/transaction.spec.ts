@@ -1,5 +1,5 @@
 import { test, expect, confirmDialog } from './fixtures';
-import { adminClient, seedCategory, seedGroup, seedTransaction, systemCategoryOf } from './db';
+import { adminClient, seedCategory, seedGroup, seedTag, seedTransaction, systemCategoryOf } from './db';
 
 async function splitsOf(transactionId: string): Promise<{ user_id: string; amount: number }[]> {
   const { data, error } = await adminClient()
@@ -27,6 +27,68 @@ function today(): string {
 }
 
 test.describe('取引の入力と編集', () => {
+  test('列21 取引に複数タグを付けて保存できる', async ({ signedIn, users }) => {
+    void users;
+    await seedCategory({ name: '交通費' });
+    await seedTag('旅行');
+    await seedTag('家族', '#f97316');
+
+    await signedIn.goto('/new');
+    await signedIn.getByLabel('カテゴリ').selectOption({ label: '交通費' });
+    await signedIn.getByLabel('金額').fill('1200');
+    await signedIn.getByRole('checkbox', { name: '旅行', exact: true }).check();
+    await signedIn.getByRole('checkbox', { name: '家族', exact: true }).check();
+    await signedIn.getByRole('button', { name: '保存', exact: true }).click();
+
+    await expect(signedIn.getByRole('heading', { name: '取引一覧' })).toBeVisible();
+    const tx = await latestTransaction();
+    const { data, error } = await adminClient()
+      .from('transaction_tags')
+      .select('tags(name)')
+      .eq('transaction_id', tx.id);
+    if (error !== null) throw error;
+    expect(data.map((row) => (row.tags as unknown as { name: string }).name).sort()).toEqual(['家族', '旅行']);
+    await expect(signedIn.getByText('旅行')).toBeVisible();
+    await expect(signedIn.getByText('家族')).toBeVisible();
+  });
+
+  test('列22 編集でタグを置き換え、すべて外せる', async ({ signedIn, users }) => {
+    const category = await seedCategory({ name: '交通費' });
+    const travel = await seedTag('旅行');
+    const work = await seedTag('出張');
+    const tx = await seedTransaction({
+      categoryId: category,
+      ownerId: users.taro,
+      payerId: users.taro,
+      createdBy: users.taro,
+      occurredOn: today(),
+      amount: 1200,
+      splits: [{ userId: users.taro, amount: 1200 }],
+      tagIds: [travel],
+    });
+
+    await signedIn.goto(`/transactions/${tx}/edit`);
+    await expect(signedIn.getByRole('checkbox', { name: '旅行', exact: true })).toBeChecked();
+    await signedIn.getByRole('checkbox', { name: '旅行', exact: true }).uncheck();
+    await signedIn.getByRole('checkbox', { name: '出張', exact: true }).check();
+    await signedIn.getByRole('button', { name: '保存', exact: true }).click();
+    await expect(signedIn.getByRole('heading', { name: '取引一覧' })).toBeVisible();
+
+    let tags = await adminClient().from('transaction_tags').select('tag_id').eq('transaction_id', tx);
+    if (tags.error !== null) throw tags.error;
+    expect(tags.data.map((row) => row.tag_id)).toEqual([work]);
+
+    await signedIn.goto(`/transactions/${tx}/edit`);
+    await expect(signedIn.getByRole('checkbox', { name: '出張', exact: true })).toBeChecked();
+    await signedIn.getByRole('checkbox', { name: '出張', exact: true }).uncheck();
+    await signedIn.getByRole('button', { name: '保存', exact: true }).click();
+    await expect(signedIn.getByRole('heading', { name: '取引一覧' })).toBeVisible();
+
+    tags = await adminClient().from('transaction_tags').select('tag_id').eq('transaction_id', tx);
+    if (tags.error !== null) throw tags.error;
+    expect(tags.data).toEqual([]);
+  });
+
   test('列1 共有カテゴリの取引を入力すると既定割合で按分される', async ({ signedIn, users }) => {
     await seedGroup(users);
     await seedCategory({ name: '家賃' });

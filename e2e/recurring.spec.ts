@@ -1,5 +1,6 @@
 import { test, expect, signIn } from './fixtures';
 import {
+  adminClient,
   archiveCategory,
   countRecurringPostings,
   countTransactions,
@@ -8,6 +9,7 @@ import {
   seedForeignGroup,
   seedGroup,
   seedRecurringRule,
+  seedTag,
 } from './db';
 
 /** 対象月は Asia/Tokyo で決まる（§5.3）。支払日1日なら今月ぶんは必ず期日を過ぎている */
@@ -23,6 +25,33 @@ function monthKey(diff = 0): string {
 }
 
 test.describe('定期登録', () => {
+  test('列17 画面で選んだタグが生成された取引へ付く', async ({ signedIn, users }) => {
+    void users;
+    await seedCategory({ name: '動画配信' });
+    const travel = await seedTag('旅行');
+
+    await signedIn.goto('/recurring');
+    await signedIn.getByRole('button', { name: '＋ ルールを追加' }).click();
+    await signedIn.getByLabel('カテゴリ').selectOption({ label: '動画配信' });
+    await signedIn.getByLabel('金額').fill('980');
+    await signedIn.getByLabel('備考').fill('タグ継承確認');
+    await signedIn.getByRole('checkbox', { name: '旅行', exact: true }).check();
+    await signedIn.getByRole('button', { name: '保存', exact: true }).click();
+    await expect(signedIn.getByTestId('rule')).toContainText('旅行');
+
+    // SPA 内を移動し、起動時の自動実行ではなく設定画面の手動実行を通す。
+    await signedIn.getByRole('link', { name: '設定' }).click();
+    await signedIn.getByRole('button', { name: '定期登録を今すぐ実行' }).click();
+    await expect(signedIn.getByTestId('recurring-run')).toContainText('1件を登録しました');
+
+    const { data, error } = await adminClient()
+      .from('transaction_tags')
+      .select('tag_id, transactions!inner(memo)')
+      .eq('transactions.memo', 'タグ継承確認');
+    if (error !== null) throw error;
+    expect(data.map((row) => row.tag_id)).toEqual([travel]);
+  });
+
   test('列1 起動時に今月の家賃が登録される', async ({ page, users }) => {
     const group = await seedGroup(users);
     const category = await seedCategory({ name: '家賃' });

@@ -28,6 +28,7 @@ import { useAuth, useWorkspace } from '../app/context';
 import { selectableCategories } from '../categories/tree';
 import { checkMove } from '../scope/move';
 import { toMoveTx } from '../app/model';
+import { TagBadge } from '../tags/TagPicker';
 import {
   activeFilterCount,
   emptyTransactionFilters,
@@ -45,6 +46,7 @@ function FilterFields({
   categories,
   profiles,
   categoryPath,
+  tags,
 }: {
   value: TransactionFilters;
   onChange: (value: TransactionFilters) => void;
@@ -52,6 +54,7 @@ function FilterFields({
   categories: { id: string }[];
   profiles: { id: string; display_name: string }[];
   categoryPath: (id: string) => string;
+  tags: { id: string; name: string }[];
 }) {
   const set = (part: Partial<TransactionFilters>) => onChange({ ...value, ...part });
   return (
@@ -100,6 +103,12 @@ function FilterFields({
               {profile.display_name}
             </option>
           ))}
+        </Select>
+      </Field>
+      <Field label="タグ">
+        <Select value={value.tagId} onChange={(e) => set({ tagId: e.target.value })}>
+          <option value="">すべて</option>
+          {tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
         </Select>
       </Field>
       <div className="grid grid-cols-2 gap-2 sm:col-span-2">
@@ -168,6 +177,7 @@ export function TransactionsPage() {
       filters,
       categoryPath: workspace.categoryPath,
       payerName: workspace.displayName,
+      tagName: (id) => workspace.tags.find((tag) => tag.id === id)?.name ?? '',
     });
   });
 
@@ -323,6 +333,7 @@ export function TransactionsPage() {
               categories={workspace.categories}
               profiles={workspace.profiles}
               categoryPath={workspace.categoryPath}
+              tags={workspace.tags}
             />
           </Card>
         </div>
@@ -358,6 +369,15 @@ export function TransactionsPage() {
                 ? '共用'
                 : workspace.displayName(filters.payerId)}{' '}
               ×
+            </button>
+          )}
+          {filters.tagId !== '' && (
+            <button
+              type="button"
+              className="rounded-full border border-[var(--c-edge)] bg-[var(--c-panel)] px-2 py-1 text-xs"
+              onClick={() => setFilters({ ...filters, tagId: '' })}
+            >
+              {workspace.tags.find((tag) => tag.id === filters.tagId)?.name ?? 'タグ'} ×
             </button>
           )}
           {(filters.amountMin !== '' || filters.amountMax !== '') && (
@@ -411,6 +431,7 @@ export function TransactionsPage() {
               categories={workspace.categories}
               profiles={workspace.profiles}
               categoryPath={workspace.categoryPath}
+              tags={workspace.tags}
             />
             <div className="sticky bottom-0 flex justify-between gap-2 bg-[var(--c-panel)] pt-2">
               <Button variant="ghost" onClick={() => setDraftFilters(emptyTransactionFilters)}>
@@ -483,6 +504,10 @@ export function TransactionsPage() {
                         </span>
                       </>
                     )}
+                    {tx.transaction_tags.flatMap(({ tag_id }) => {
+                      const tag = workspace.tags.find((item) => item.id === tag_id);
+                      return tag === undefined ? [] : [<TagBadge key={tag.id} tag={tag} />];
+                    })}
                     <div className="pointer-events-auto ml-auto flex shrink-0 items-center gap-3 text-sm">
                       <Link
                         className="text-[var(--c-link)]"
@@ -513,6 +538,7 @@ export function TransactionsPage() {
                 <th className="p-2">日付</th>
                 <th className="p-2">共有範囲</th>
                 <th className="p-2">カテゴリ</th>
+                <th className="p-2">タグ</th>
                 <th className="p-2">支払者</th>
                 <th className="p-2 text-right">金額</th>
                 <th className="p-2">備考</th>
@@ -540,6 +566,14 @@ export function TransactionsPage() {
                       />
                     </td>
                     <td className="p-2">{workspace.categoryPath(category.id)}</td>
+                    <td className="p-2">
+                      <div className="flex flex-wrap gap-1">
+                        {tx.transaction_tags.flatMap(({ tag_id }) => {
+                          const tag = workspace.tags.find((item) => item.id === tag_id);
+                          return tag === undefined ? [] : [<TagBadge key={tag.id} tag={tag} />];
+                        })}
+                      </div>
+                    </td>
                     <td className="p-2">{workspace.displayName(tx.payer_id)}</td>
                     <td className="p-2 text-right tabular-nums">{formatAmount(tx.amount)}</td>
                     <td className="p-2">{tx.memo}</td>

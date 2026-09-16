@@ -29,6 +29,11 @@ const tx = {
 };
 
 describe('transactionCsv', () => {
+  it('列13 複数のタグを名前順に書き出す', () => {
+    const { rows } = parseCsvRows(transactionCsv([{ ...tx, tagNames: ['旅行', '家族'] }], names, groups));
+    expect(rows[0]!.タグ).toBe('家族;旅行');
+  });
+
   it('列1 負担を常に明示して書き出す', () => {
     const { rows } = parseCsvRows(transactionCsv([tx], names, groups));
     expect(rows[0]).toMatchObject({

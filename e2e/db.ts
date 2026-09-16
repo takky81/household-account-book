@@ -75,6 +75,7 @@ export async function resetData(): Promise<void> {
     db.from('transactions').delete().neq('id', all),
     db.from('recurring_rules').delete().neq('id', all),
     db.from('budgets').delete().neq('id', all),
+    db.from('tags').delete().neq('id', all),
     db.from('categories').delete().eq('is_system', false),
     db.from('share_groups').delete().neq('id', all),
   ]) {
@@ -138,6 +139,16 @@ export async function seedCategory(input: {
   return data.id as string;
 }
 
+export async function seedTag(name: string, color = '#0ea5e9'): Promise<string> {
+  const { data, error } = await adminClient()
+    .from('tags')
+    .insert({ name, color, sort_order: 10 })
+    .select('id')
+    .single();
+  if (error !== null) throw error;
+  return data.id as string;
+}
+
 /** 取引を1件作る。負担は明示する。 */
 export async function seedTransaction(input: {
   categoryId: string;
@@ -150,6 +161,7 @@ export async function seedTransaction(input: {
   amount: number;
   memo?: string;
   splits: { userId: string; amount: number }[];
+  tagIds?: string[];
 }): Promise<string> {
   const db = adminClient();
   const tx = await db
@@ -172,6 +184,12 @@ export async function seedTransaction(input: {
     input.splits.map((s) => ({ transaction_id: id, user_id: s.userId, amount: s.amount })),
   );
   if (splits.error !== null) throw splits.error;
+  if (input.tagIds !== undefined && input.tagIds.length > 0) {
+    const tags = await db.from('transaction_tags').insert(
+      input.tagIds.map((tagId) => ({ transaction_id: id, tag_id: tagId })),
+    );
+    if (tags.error !== null) throw tags.error;
+  }
   return id;
 }
 

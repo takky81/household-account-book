@@ -34,6 +34,7 @@ export type AggregateTx = {
   amount: number;
   payerId: string | null;
   splits: { userId: string; amount: number }[];
+  tags?: { id: string; name: string }[];
 };
 
 /** 大分類そのものに付いた取引を、小分類と並べて見せるときの名前（§5.4）。 */
@@ -54,6 +55,7 @@ export type CategoryTotal = {
 };
 
 export type UserTotal = { userId: string; amount: number };
+export type TagTotal = { tagId: string; name: string; amount: number };
 
 export type MonthTotals = {
   income: number;
@@ -61,6 +63,8 @@ export type MonthTotals = {
   balance: number;
   byCategory: CategoryTotal[];
   byUser: UserTotal[];
+  /** 複数タグの取引は各タグに全額を数えるため、この列同士は加算できない。 */
+  byTag: TagTotal[];
 };
 
 export type Members = Record<string, string[]>;
@@ -111,17 +115,22 @@ export function aggregateMonth(input: {
   basis: Basis;
   selfId: string;
   members: Members;
+  tagId?: string | null;
 }): MonthTotals {
-  const { transactions, monthKey, scope, basis, selfId, members } = input;
+  const { transactions, monthKey, scope, basis, selfId, members, tagId = null } = input;
   const users = targetUsers(scope, selfId, members);
   const rows = transactions.filter(
-    (tx) => monthKeyOf(tx.occurredOn) === monthKey && inScope(tx, scope, selfId),
+    (tx) =>
+      monthKeyOf(tx.occurredOn) === monthKey &&
+      inScope(tx, scope, selfId) &&
+      (tagId === null || (tx.tags ?? []).some((tag) => tag.id === tagId)),
   );
 
   let income = 0;
   let expense = 0;
   const byCategory = new Map<string, CategoryTotal>();
   const byUser = new Map<string, number>();
+  const byTag = new Map<string, TagTotal>();
 
   // グループを見るときは、現メンバーとデータに現れる人の和集合を並べる（§3.3）
   if (scope.kind === 'group') {
@@ -134,6 +143,11 @@ export function aggregateMonth(input: {
     else expense += amount;
 
     if (amount !== 0 && tx.kind === 'expense') {
+      for (const tag of tx.tags ?? []) {
+        const current = byTag.get(tag.id);
+        if (current === undefined) byTag.set(tag.id, { tagId: tag.id, name: tag.name, amount });
+        else current.amount += amount;
+      }
       // 内訳は大分類で集約する。小分類の取引は親の行に足し、内訳として持つ
       const rootId = rootIdOf({ id: tx.categoryId, parentId: tx.parentId ?? null });
       // 対象範囲は先に絞られている。「すべて」では財布をまたいで同じカテゴリを合算する。
@@ -189,6 +203,7 @@ export function aggregateMonth(input: {
     byUser: [...byUser.entries()]
       .map(([userId, amount]) => ({ userId, amount }))
       .sort((a, b) => b.amount - a.amount || (a.userId < b.userId ? -1 : 1)),
+    byTag: [...byTag.values()].sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name, 'ja')),
   };
 }
 

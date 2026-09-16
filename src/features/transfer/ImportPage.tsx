@@ -30,6 +30,7 @@ export function ImportPage() {
         groups: workspace.groups,
         members,
         categories: workspace.tree,
+        tags: workspace.tags,
         existing: existing.map((tx) => ({
           occurredOn: tx.occurred_on,
           categoryId: tx.category_id,
@@ -39,6 +40,7 @@ export function ImportPage() {
           payerId: tx.payer_id,
           memo: tx.memo,
           splits: tx.transaction_splits.map((s) => ({ userId: s.user_id, amount: s.amount })),
+          tagIds: tx.transaction_tags.map((tag) => tag.tag_id),
         })),
         unknownCategory,
         duplicates,
@@ -87,6 +89,7 @@ export function ImportPage() {
                 payerId: entry.payload.payerId,
                 memo: entry.payload.memo,
                 splits: entry.payload.splits,
+                tagIds: entry.payload.tagIds,
               },
             ]
           : [],

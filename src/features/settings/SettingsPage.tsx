@@ -223,6 +223,9 @@ export function SettingsPage() {
         <Link className="text-sm text-[var(--c-link)]" to="/categories">
           カテゴリ
         </Link>
+        <Link className="text-sm text-[var(--c-link)]" to="/tags">
+          タグ
+        </Link>
         <Link className="text-sm text-[var(--c-link)]" to="/groups">
           共有グループ
         </Link>

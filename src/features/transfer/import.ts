@@ -22,6 +22,7 @@ export type ExistingTx = {
   payerId: string | null;
   memo: string;
   splits: Split[];
+  tagIds?: string[];
 };
 
 export type ImportContext = {
@@ -31,6 +32,7 @@ export type ImportContext = {
   /** グループごとのメンバー。負担の既定按分に使う */
   members: Record<string, MemberLike[]>;
   categories: (CategoryLike & { isSystem?: boolean })[];
+  tags?: { id: string; name: string }[];
   existing: ExistingTx[];
   /** 未知のカテゴリ名をどう扱うか（列7・列8） */
   unknownCategory: 'create' | 'uncategorized';
@@ -58,6 +60,7 @@ export type ImportPayload = {
   payerId: string | null;
   memo: string;
   splits: Split[];
+  tagIds: string[];
 };
 
 export type ImportEntry =
@@ -217,6 +220,14 @@ export function analyzeImport(text: string, context: ImportContext): ImportResul
     if (total !== amount) return error(`負担の合計 ${total} が金額 ${amount} と一致しません`);
 
     const memo = row['備考'] ?? '';
+    const tagNames = (row['タグ'] ?? '').split(';').map((value) => value.trim()).filter(Boolean);
+    if (new Set(tagNames).size !== tagNames.length) return error('同じタグが2回指定されています');
+    const tagIds: string[] = [];
+    for (const tagName of tagNames) {
+      const tag = (context.tags ?? []).find((item) => item.name === tagName);
+      if (tag === undefined) return error(`タグが見つかりません: ${tagName}`);
+      tagIds.push(tag.id);
+    }
     const payload: ImportPayload = {
       categoryId,
       shareGroupId,
@@ -227,6 +238,7 @@ export function analyzeImport(text: string, context: ImportContext): ImportResul
       payerId,
       memo,
       splits,
+      tagIds,
     };
 
     // 重複の判定は按分を適用した後の値で行う（列4）。
@@ -240,7 +252,8 @@ export function analyzeImport(text: string, context: ImportContext): ImportResul
         e.amount === amount &&
         e.payerId === payerId &&
         e.memo === memo &&
-        sameSplits(e.splits, splits),
+        sameSplits(e.splits, splits) &&
+        [...(e.tagIds ?? [])].sort().join(';') === [...tagIds].sort().join(';'),
     );
     if (duplicated && context.duplicates === 'skip') {
       entries.push({ line, status: 'skip', message: '同じ内容の取引がすでにあります' });

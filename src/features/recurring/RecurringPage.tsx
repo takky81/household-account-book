@@ -32,6 +32,7 @@ import { scopeKey } from '../categories/name';
 import { selectableCategories } from '../categories/tree';
 import { nextDueDate } from './schedule';
 import { validateRecurringRule } from './validation';
+import { TagBadge, TagPicker } from '../tags/TagPicker';
 
 const SHARED = '__shared__';
 
@@ -52,6 +53,7 @@ type FormState = {
   payer: string;
   memo: string;
   splits: Split[] | null;
+  tagIds: string[];
 };
 
 function emptyForm(selfId: string, scopeKey: string): FormState {
@@ -65,6 +67,7 @@ function emptyForm(selfId: string, scopeKey: string): FormState {
     payer: selfId,
     memo: '',
     splits: null,
+    tagIds: [],
   };
 }
 
@@ -148,6 +151,7 @@ export function RecurringPage() {
       splits: rule.splits_are_manual
         ? rule.recurring_rule_splits.map((s) => ({ userId: s.user_id, amount: s.amount }))
         : null,
+      tagIds: rule.recurring_rule_tags.map((tag) => tag.tag_id),
     });
   }
 
@@ -169,6 +173,7 @@ export function RecurringPage() {
       endMonth: form.endMonth === '' ? null : form.endMonth,
       // 個人の負担は本人1行＝全額に決まるので雛形を持たせない（§3.6）
       splits: isPersonal || form.splits === null ? undefined : form.splits,
+      tagIds: form.tagIds,
     };
     const check = validateRecurringRule(input);
     if (!check.ok) {
@@ -212,6 +217,7 @@ export function RecurringPage() {
         splits: rule.splits_are_manual
           ? rule.recurring_rule_splits.map((s) => ({ userId: s.user_id, amount: s.amount }))
           : undefined,
+        tagIds: rule.recurring_rule_tags.map((tag) => tag.tag_id),
       });
       await reload();
     } catch (failure) {
@@ -280,6 +286,14 @@ export function RecurringPage() {
                         : `次回 ${formatDay(next)}`}
                   </span>
                 </div>
+                {rule.recurring_rule_tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {rule.recurring_rule_tags.flatMap(({ tag_id }) => {
+                      const tag = workspace.tags.find((item) => item.id === tag_id);
+                      return tag === undefined ? [] : [<TagBadge key={tag.id} tag={tag} />];
+                    })}
+                  </div>
+                )}
                 {target?.is_archived === true && (
                   <p role="alert" className="text-xs text-[var(--c-warn)]">
                     カテゴリがアーカイブされているため登録されません
@@ -446,6 +460,14 @@ export function RecurringPage() {
               onChange={(e) => setForm({ ...form, memo: e.target.value })}
             />
           </Field>
+
+          <FieldGroup label="タグ（生成される取引へ引き継ぎます）">
+            <TagPicker
+              tags={workspace.tags}
+              value={form.tagIds}
+              onChange={(tagIds) => setForm({ ...form, tagIds })}
+            />
+          </FieldGroup>
 
           <div className="flex gap-2">
             <Button variant="ghost" className="flex-1" onClick={() => setForm(null)}>

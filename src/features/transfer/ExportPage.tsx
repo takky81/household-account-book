@@ -40,7 +40,7 @@ export function ExportPage() {
         month === null ? {} : { from: monthStart(month), to: monthEnd(month) },
       );
       const text = transactionCsv(
-        filterByMonth(toExportTx(rows, workspace.categories), month),
+        filterByMonth(toExportTx(rows, workspace.categories, workspace.tags), month),
         names,
         groupNames,
       );

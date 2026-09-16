@@ -93,6 +93,39 @@ describe('targetUsers', () => {
 });
 
 describe('aggregateMonth', () => {
+  it('列14 タグで絞っても選択中の集計基準で数える', () => {
+    const result = aggregateMonth({
+      transactions: [
+        { ...food, tags: [{ id: 'travel', name: '旅行' }] },
+        { ...rent, tags: [{ id: 'home', name: '住まい' }] },
+      ],
+      monthKey: '2026-08',
+      scope: { kind: 'all' },
+      basis: 'burden',
+      selfId: taro,
+      members,
+      tagId: 'travel',
+    });
+    expect(result.expense).toBe(2100);
+    expect(result.byCategory.map((row) => row.name)).toEqual(['食費']);
+  });
+
+  it('列15 複数タグには各タグへ全額を数え、支出合計は重複させない', () => {
+    const result = aggregateMonth({
+      transactions: [{ ...food, tags: [{ id: 'travel', name: '旅行' }, { id: 'family', name: '家族' }] }],
+      monthKey: '2026-08',
+      scope: { kind: 'group', shareGroupId: 夫婦 },
+      basis: 'burden',
+      selfId: taro,
+      members,
+    });
+    expect(result.expense).toBe(4200);
+    expect(result.byTag).toEqual([
+      { tagId: 'family', name: '家族', amount: 4200 },
+      { tagId: 'travel', name: '旅行', amount: 4200 },
+    ]);
+  });
+
   it('列1 負担額基準では自分の負担を合計する（個人の取引も含む）', () => {
     const result = aggregateMonth({
       transactions: all,

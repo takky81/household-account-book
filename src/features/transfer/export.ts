@@ -23,6 +23,7 @@ export const TRANSACTION_HEADER = [
   '共有範囲',
   'カテゴリ',
   '小分類',
+  'タグ',
   '金額',
   '支払者',
   '負担',
@@ -46,6 +47,7 @@ export type ExportTx = {
   categoryName: string;
   /** 小分類の名前。大分類そのものに付いた取引は null（§4.2） */
   subcategoryName: string | null;
+  tagNames?: string[];
   amount: number;
   payerId: string | null;
   splits: { userId: string; amount: number }[];
@@ -79,6 +81,7 @@ export function transactionCsv(rows: ExportTx[], names: Names, groupNames: Names
       scopeLabel(tx.shareGroupId, groupNames),
       tx.categoryName,
       tx.subcategoryName ?? '',
+      [...(tx.tagNames ?? [])].sort((a, b) => a.localeCompare(b, 'ja')).join(';'),
       String(tx.amount),
       tx.payerId === null ? SHARED_LABEL : (names[tx.payerId] ?? ''),
       splitsLabel(tx.splits, names),

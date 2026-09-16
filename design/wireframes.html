@@ -202,10 +202,8 @@
 
           <div class="field"><label>日付</label><div class="input">2026-08-31</div></div>
 
-          <div class="field">
-            <label>カテゴリ（共有範囲はカテゴリが決める）</label>
-            <div class="input"><span class="tag shared">夫婦</span>&nbsp;食費</div>
-          </div>
+          <div class="field"><label>共有範囲</label><div class="tabs"><span class="tab">個人</span><span class="tab on">夫婦</span></div></div>
+          <div class="field"><label>カテゴリ</label><div class="input">食費</div></div>
 
           <div class="field"><label>金額</label><div class="input amount" style="font-size: 20px">4,200</div></div>
 
@@ -223,6 +221,7 @@
           </div>
 
           <div class="field"><label>備考</label><div class="input placeholder">スーパー</div></div>
+          <div class="field"><label>タグ（複数選択）</label><div><span class="tag shared">旅行 ✓</span> <span class="tag own">家族</span></div></div>
 
           <div class="row">
             <div class="btn ghost grow">保存して続けて入力</div>
@@ -319,6 +318,7 @@
                 <span class="tab on">負担額</span><span class="tab">支払額</span>
               </span>
             </span>
+            <span>タグ <span class="input">旅行 ▼</span></span>
           </div>
 
           <div class="row" style="align-items: stretch">
@@ -333,6 +333,13 @@
                 </div>
               </div>
               <div class="note">個人と共有の額をカテゴリごとに合算（§5.4）</div>
+            </div>
+
+            <div class="card col grow">
+              <h3>タグ別の内訳</h3>
+              <div class="row"><span>旅行</span><span class="amount">31,400</span></div>
+              <div class="row"><span>家族</span><span class="amount">12,800</span></div>
+              <div class="note">複数タグの取引はそれぞれに全額を数えるため、タグ別金額は合計できない</div>
             </div>
 
             <div class="card col grow">
@@ -578,6 +585,7 @@
             <div class="field"><label>表示名</label><div class="input">たかし</div></div>
             <div class="field"><label>色</label><div class="input">■ #4a6fa5</div></div>
             <div class="field"><label>入力時の既定カテゴリ</label><div class="input"><span class="tag shared">夫婦</span>&nbsp;食費</div></div>
+            <div class="row"><span>タグ管理</span><span class="btn ghost small">開く</span></div>
             <div class="row"><span>テーマ</span><span class="tabs"><span class="tab">OS に合わせる</span><span class="tab on">ライト</span><span class="tab">ダーク</span></span></div>
             <div class="btn ghost">ログアウト</div>
             <div class="note">表示名は CSV が人を指すのに使うため一意。`共用` `個人` `:` `;` は使えない（§3.1）</div>

@@ -40,6 +40,15 @@ export type Category = {
   is_archived: boolean;
 };
 
+/** 全ユーザー共通のタグ。カテゴリと異なり収支区分や階層を持たない。 */
+export type Tag = {
+  id: string;
+  name: string;
+  color: string;
+  sort_order: number;
+  is_archived: boolean;
+};
+
 /**
  * 共有範囲。取引・予算・定期登録ルールが持つ（§2.4）。
  * share_group_id が入っていれば共有、null なら個人で owner_id が入る。
@@ -59,6 +68,7 @@ export type Transaction = ScopeColumns & {
   splits_are_manual: boolean;
   memo: string;
   transaction_splits: { user_id: string; amount: number }[];
+  transaction_tags: { tag_id: string }[];
 };
 
 export type Budget = ScopeColumns & {
@@ -83,6 +93,7 @@ export type RecurringRule = ScopeColumns & {
   is_paused: boolean;
   splits_are_manual: boolean;
   recurring_rule_splits: { user_id: string; amount: number }[];
+  recurring_rule_tags: { tag_id: string }[];
 };
 
 /** 生成の記録（§3.9）。取引を消しても残るので、生成済みかはこの表で決まる */
@@ -104,6 +115,7 @@ export type Workspace = {
   groups: ShareGroup[];
   members: GroupMember[];
   categories: Category[];
+  tags: Tag[];
 };
 
 function unwrap<T>(result: { data: T | null; error: { message: string } | null }): T {
@@ -113,21 +125,23 @@ function unwrap<T>(result: { data: T | null; error: { message: string } | null }
 }
 
 export async function loadWorkspace(): Promise<Workspace> {
-  const [profiles, groups, members, categories] = await Promise.all([
+  const [profiles, groups, members, categories, tags] = await Promise.all([
     supabase.from('profiles').select('id, display_name, color, default_category_id'),
     supabase.from('share_groups').select('id, name').order('name'),
     supabase.from('share_group_members').select('*').order('sort_order'),
     supabase.from('categories').select('*').order('sort_order').order('name'),
+    supabase.from('tags').select('*').order('sort_order').order('name'),
   ]);
   return {
     profiles: unwrap(profiles) as Profile[],
     groups: unwrap(groups) as ShareGroup[],
     members: unwrap(members) as GroupMember[],
     categories: unwrap(categories) as Category[],
+    tags: unwrap(tags) as Tag[],
   };
 }
 
-const TX_COLUMNS = '*, transaction_splits(user_id, amount)';
+const TX_COLUMNS = '*, transaction_splits(user_id, amount), transaction_tags(tag_id)';
 
 /**
  * 取引を範囲で取る。上限を超えてもエラーにならず黙って打ち切られるため、
@@ -167,7 +181,7 @@ export async function loadBudgets(monthKeys: string[]): Promise<Budget[]> {
 export async function loadRecurringRules(): Promise<RecurringRule[]> {
   const { data, error } = await supabase
     .from('recurring_rules')
-    .select('*, recurring_rule_splits(user_id, amount)')
+    .select('*, recurring_rule_splits(user_id, amount), recurring_rule_tags(tag_id)')
     .order('day_of_month')
     .order('id');
   if (error !== null) throw new Error(error.message);
@@ -196,6 +210,7 @@ export type SaveTransaction = {
   memo: string;
   /** 渡すと手入力の負担として扱う。省略すると RPC が既定割合で按分する */
   splits?: Split[];
+  tagIds: string[];
 };
 
 export async function saveTransaction(input: SaveTransaction): Promise<string> {
@@ -212,6 +227,7 @@ export async function saveTransaction(input: SaveTransaction): Promise<string> {
         ? null
         : input.splits.map((s) => ({ user_id: s.userId, amount: s.amount })),
     p_id: input.id ?? null,
+    p_tag_ids: input.tagIds,
   });
   if (error !== null) throw new Error(error.message);
   return data as string;
@@ -237,6 +253,7 @@ export type SaveRecurringRule = {
   isPaused: boolean;
   /** 渡すと手入力の雛形として扱う。省略すると生成のたびに既定按分する（§3.9） */
   splits?: Split[];
+  tagIds: string[];
 };
 
 export async function saveRecurringRule(input: SaveRecurringRule): Promise<string> {
@@ -256,6 +273,7 @@ export async function saveRecurringRule(input: SaveRecurringRule): Promise<strin
         ? null
         : input.splits.map((s) => ({ user_id: s.userId, amount: s.amount })),
     p_id: input.id ?? null,
+    p_tag_ids: input.tagIds,
   });
   if (error !== null) throw new Error(error.message);
   return data as string;
@@ -290,6 +308,28 @@ export async function createCategory(input: {
     sort_order: input.sortOrder,
     parent_id: input.parentId ?? null,
   });
+  if (error !== null) throw new Error(error.message);
+}
+
+export async function createTag(input: {
+  name: string;
+  color: string;
+  sortOrder: number;
+}): Promise<void> {
+  const { error } = await supabase.from('tags').insert({
+    name: input.name.trim(),
+    color: input.color,
+    sort_order: input.sortOrder,
+  });
+  if (error !== null) throw new Error(error.message);
+}
+
+export async function updateTag(
+  id: string,
+  patch: { name?: string; color?: string; sort_order?: number; is_archived?: boolean },
+): Promise<void> {
+  const next = patch.name === undefined ? patch : { ...patch, name: patch.name.trim() };
+  const { error } = await supabase.from('tags').update(next).eq('id', id);
   if (error !== null) throw new Error(error.message);
 }
 
@@ -493,6 +533,7 @@ export async function importTransactions(
     payerId: string | null;
     memo: string;
     splits: Split[];
+    tagIds: string[];
   }[],
 ): Promise<number> {
   const { data, error } = await supabase.rpc('import_transactions', {
@@ -505,6 +546,7 @@ export async function importTransactions(
       payer_id: row.payerId,
       memo: row.memo,
       splits: row.splits.map((s) => ({ user_id: s.userId, amount: s.amount })),
+      tag_ids: row.tagIds,
     })),
   });
   if (error !== null) throw new Error(error.message);

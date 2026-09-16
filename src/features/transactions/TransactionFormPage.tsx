@@ -23,6 +23,7 @@ import { useAuth, useWorkspace } from '../app/context';
 import { validateTransaction } from './validation';
 import { scopeKey, type Kind } from '../categories/name';
 import { selectableCategories } from '../categories/tree';
+import { TagPicker } from '../tags/TagPicker';
 
 const SHARED = '__shared__';
 
@@ -53,6 +54,7 @@ export function TransactionFormPage() {
   const [payer, setPayer] = useState<string>(selfId);
   const [manualSplits, setManualSplits] = useState<Split[] | null>(null);
   const [memo, setMemo] = useState('');
+  const [tagIds, setTagIds] = useState<string[]>([]);
   /** 編集で読み込んだときの支払者。変わっていなければメンバー検査を省く（列11） */
   const [loadedPayer, setLoadedPayer] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -109,7 +111,7 @@ export function TransactionFormPage() {
     void (async () => {
       const { data } = await supabase
         .from('transactions')
-        .select('*, transaction_splits(user_id, amount)')
+        .select('*, transaction_splits(user_id, amount), transaction_tags(tag_id)')
         .eq('id', id)
         .single();
       const tx = data as Transaction | null;
@@ -122,6 +124,7 @@ export function TransactionFormPage() {
       setAmountText(String(tx.amount));
       setPayer(tx.payer_id ?? SHARED);
       setMemo(tx.memo);
+      setTagIds(tx.transaction_tags.map((tag) => tag.tag_id));
       setLoadedPayer(tx.payer_id ?? SHARED);
       if (tx.splits_are_manual) {
         // 読み込んだ順は決まらないので、既定の按分と同じ並び（メンバーの順、
@@ -224,6 +227,7 @@ export function TransactionFormPage() {
         amount: parsed,
         payerId,
         memo,
+        tagIds,
         splits: manualSplits ?? undefined,
       });
       if (again) {
@@ -418,6 +422,10 @@ export function TransactionFormPage() {
       <Field label="備考">
         <TextInput value={memo} onChange={(e) => setMemo(e.target.value)} />
       </Field>
+
+      <FieldGroup label="タグ（複数選べます）">
+        <TagPicker tags={workspace.tags} value={tagIds} onChange={setTagIds} />
+      </FieldGroup>
 
       <ErrorText>{error}</ErrorText>
       {saved !== '' && <p className="text-xs text-[var(--c-income)]">{saved}</p>}
