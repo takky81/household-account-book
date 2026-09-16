@@ -142,31 +142,6 @@ export function AggregatePage() {
       </Card>
 
       <Card>
-        <h2 className="mb-2 text-sm font-bold">タグ別の内訳</h2>
-        {totals.byTag.length === 0 ? (
-          <p className="text-xs text-[var(--c-muted)]">タグ付きの支出はありません</p>
-        ) : (
-          <ul className="flex flex-col gap-1">
-            {totals.byTag.map((row) => {
-              const tag = workspace.tags.find((item) => item.id === row.tagId);
-              return (
-                <li key={row.tagId} className="flex justify-between text-sm">
-                  <span className="flex items-center gap-1">
-                    <span className="size-2.5 rounded-full" style={{ background: tag?.color }} />
-                    {row.name}
-                  </span>
-                  <span className="tabular-nums">{formatAmount(row.amount)}</span>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-        <p className="mt-2 text-xs text-[var(--c-muted)]">
-          複数タグの取引はそれぞれに全額を数えるため、タグ別金額は合計できません
-        </p>
-      </Card>
-
-      <Card>
         <h2 className="mb-2 text-sm font-bold">カテゴリ別の内訳</h2>
         {totals.byCategory.length === 0 && (
           <p className="text-xs text-[var(--c-muted)]">この月の取引はありません</p>
@@ -220,6 +195,31 @@ export function AggregatePage() {
             })}
           </ul>
         </div>
+      </Card>
+
+      <Card>
+        <h2 className="mb-2 text-sm font-bold">タグ別の内訳</h2>
+        {totals.byTag.length === 0 ? (
+          <p className="text-xs text-[var(--c-muted)]">タグ付きの支出はありません</p>
+        ) : (
+          <ul className="flex flex-col gap-1">
+            {totals.byTag.map((row) => {
+              const tag = workspace.tags.find((item) => item.id === row.tagId);
+              return (
+                <li key={row.tagId} className="flex justify-between text-sm">
+                  <span className="flex items-center gap-1">
+                    <span className="size-2.5 rounded-full" style={{ background: tag?.color }} />
+                    {row.name}
+                  </span>
+                  <span className="tabular-nums">{formatAmount(row.amount)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <p className="mt-2 text-xs text-[var(--c-muted)]">
+          複数タグの取引はそれぞれに全額を数えるため、タグ別金額は合計できません
+        </p>
       </Card>
 
       <Card>
