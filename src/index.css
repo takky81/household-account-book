@@ -17,6 +17,8 @@
   --c-paper: #f5f8fc; /* 画面の地 */
   --c-panel: #ffffff; /* カード・ペインの地 */
   --c-subtle: #e8eef7; /* 見出しの帯・表のヘッダ */
+  /* 意味色と競合せず、画面の地とも同化しない取引一覧の日付グループ用の縞 */
+  --c-date-stripe: #fdfcff;
   --c-hover: #d3e0f2; /* 白抜きボタンにカーソルを乗せたとき */
   --c-ink: #132a45; /* 文字と主要な枠線・主ボタンの地 */
   --c-ink-hover: #0d1e33;
@@ -55,6 +57,7 @@
   --c-paper: #0f1823;
   --c-panel: #17212e;
   --c-subtle: #1e2a39;
+  --c-date-stripe: #211f32;
   --c-hover: #28374a;
   --c-ink: #e9eff7;
   --c-ink-hover: #ffffff;

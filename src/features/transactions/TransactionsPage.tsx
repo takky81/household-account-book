@@ -17,6 +17,7 @@ import { MonthNav } from '../app/Layout';
 import { currentMonthKey, formatDay, monthEnd, monthStart } from '../../lib/date';
 import { formatAmount } from '../../lib/money';
 import { useNarrow } from '../../lib/useNarrow';
+import { cn } from '../../lib/utils';
 import {
   deleteTransaction,
   loadMonthTransactions,
@@ -36,6 +37,7 @@ import {
   SHARED_PAYER_FILTER,
   type TransactionFilters,
 } from './filter';
+import { stripeDateGroups } from './dateStripe';
 
 type ScopeFilterValue = 'all' | 'own' | string;
 
@@ -182,6 +184,7 @@ export function TransactionsPage() {
   });
 
   const filterCount = activeFilterCount(filters);
+  const stripedVisible = stripeDateGroups(visible);
 
   function changeMonth(next: string) {
     setMonthKey(next);
@@ -453,12 +456,17 @@ export function TransactionsPage() {
       {/* 狭い画面では8列が横に入りきらないので、1取引=1枚のカードに積む（Layout と同じ境目）。 */}
       {narrow ? (
         <ul className="flex flex-col gap-1.5" data-testid="tx-cards">
-          {visible.map((tx) => {
+          {stripedVisible.map(({ row: tx, tinted }) => {
             const category = categoryOf(tx);
             const categoryPath = workspace.categoryPath(category.id);
             return (
-              <li key={tx.id}>
-                <Card className="flex flex-col gap-0.5 px-3 py-2">
+              <li key={tx.id} data-date-tone={tinted ? 'tinted' : 'plain'}>
+                <Card
+                  className={cn(
+                    'flex flex-col gap-0.5 px-3 py-2',
+                    tinted && 'bg-[var(--c-date-stripe)]',
+                  )}
+                >
                   <div className="flex min-w-0 items-center gap-2">
                     <label className="-m-3 flex size-11 shrink-0 items-center justify-center">
                       <input
@@ -538,10 +546,17 @@ export function TransactionsPage() {
               </tr>
             </thead>
             <tbody>
-              {visible.map((tx) => {
+              {stripedVisible.map(({ row: tx, tinted }) => {
                 const category = categoryOf(tx);
                 return (
-                  <tr key={tx.id} className="border-t border-[var(--c-line)]">
+                  <tr
+                    key={tx.id}
+                    data-date-tone={tinted ? 'tinted' : 'plain'}
+                    className={cn(
+                      'border-t border-[var(--c-line)]',
+                      tinted && 'bg-[var(--c-date-stripe)]',
+                    )}
+                  >
                     <td className="p-2">
                       <input
                         type="checkbox"

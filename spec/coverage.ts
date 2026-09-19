@@ -87,6 +87,7 @@ const SOURCES: Record<string, string[]> = {
     'src/lib/submitGuard.test.ts',
     'src/lib/contrast.test.ts',
     'src/components/ConfirmDialog.test.tsx',
+    'src/features/transactions/dateStripe.test.ts',
   ],
 };
 

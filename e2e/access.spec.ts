@@ -46,7 +46,10 @@ test.describe('アクセス制御', () => {
     await expect(page.getByText('たろうの個人の取引')).toHaveCount(0);
   });
 
-  test('列3 属さないグループのカテゴリも取引も見えない', async ({ page, users }) => {
+  test('列1 属さないグループの取引は見えず、共通カテゴリは見える', async ({
+    page,
+    users,
+  }) => {
     const group = await seedGroup(users);
     const shared = await seedCategory({ name: '家賃' });
     await seedTransaction({
@@ -68,8 +71,8 @@ test.describe('アクセス制御', () => {
     await expect(page.getByText('夫婦の取引')).toHaveCount(0);
 
     await page.goto('/categories');
-    await expect(page.getByLabel('家賃の名前')).toHaveCount(0);
-    // 自分の未分類だけが見える
+    await expect(page.getByLabel('家賃の名前')).toBeVisible();
+    // 未分類も全ユーザー共通で、収支区分ごとに1件
     await expect(page.getByText('（消せない）')).toHaveCount(1);
   });
 });

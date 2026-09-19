@@ -13,6 +13,7 @@
         --c-paper: #f5f8fc;
         --c-panel: #ffffff;
         --c-subtle: #e8eef7;
+        --c-date-stripe: #fdfcff;
         --c-hover: #d3e0f2;
         --c-ink: #132a45;
         --c-ink-soft: #42566e;
@@ -103,6 +104,7 @@
       th { background: var(--c-subtle); color: var(--c-ink-soft); font-weight: normal; text-align: left; }
       th, td { border: 1px solid var(--c-line); padding: 4px 6px; }
       td.num { text-align: right; font-variant-numeric: tabular-nums; }
+      tr.date-alt td { background: var(--c-date-stripe); }
 
       .overlay { position: relative; background: var(--c-overlay); padding: 24px 16px; display: flex; justify-content: center; }
       .dialog { background: var(--c-panel); border: 1px solid var(--c-line); border-radius: 8px;
@@ -295,21 +297,25 @@
           </div>
           <table>
             <tr><th>日付</th><th>共有範囲</th><th>カテゴリ</th><th>支払者</th><th>負担</th><th style="text-align: right">金額</th><th>備考</th><th></th></tr>
-            <tr>
+            <tr class="date-alt">
               <td>08-31</td><td><span class="tag shared">夫婦</span></td><td>家賃</td><td>共用</td>
               <td class="muted">60,000 / 60,000</td><td class="num expense">120,000</td><td>8月分</td><td class="muted">…</td>
             </tr>
-            <tr>
+            <tr class="date-alt">
               <td>08-31</td><td><span class="tag shared">夫婦</span></td><td>食費</td><td>はなこ</td>
               <td class="muted">2,100 / 2,100</td><td class="num expense">4,200</td><td>まとめ買い</td><td class="muted">…</td>
             </tr>
-            <tr>
+            <tr class="date-alt">
               <td>08-31</td><td><span class="tag own">個人</span></td><td>食費</td><td>たかし</td>
               <td class="muted">780</td><td class="num expense">780</td><td>昼食</td><td class="muted">…</td>
             </tr>
             <tr>
               <td>08-25</td><td><span class="tag shared">夫婦</span></td><td>給与</td><td>たかし</td>
               <td class="muted">320,000</td><td class="num income">320,000</td><td></td><td class="muted">…</td>
+            </tr>
+            <tr class="date-alt">
+              <td>08-10</td><td><span class="tag own">個人</span></td><td>交通費</td><td>たかし</td>
+              <td class="muted">1,200</td><td class="num expense">1,200</td><td>電車</td><td class="muted">…</td>
             </tr>
           </table>
           <div class="row">

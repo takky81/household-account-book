@@ -214,4 +214,64 @@ test.describe('表示設定と共通の振る舞い', () => {
     await expect(signedIn.getByLabel('食費をアーカイブ')).toBeVisible();
     await expect(signedIn.getByLabel('食費を削除')).toBeVisible();
   });
+
+  test('列13 取引一覧は日付グループごとに背景色を交互にする', async ({
+    signedIn,
+    users,
+  }) => {
+    const category = await seedCategory({ name: '日用品' });
+    const month = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' }).slice(0, 7);
+    for (const [day, memo] of [
+      ['19', '19日その1'],
+      ['19', '19日その2'],
+      ['15', '15日'],
+      ['02', '2日'],
+    ]) {
+      await seedTransaction({
+        categoryId: category,
+        ownerId: users.taro,
+        payerId: users.taro,
+        createdBy: users.taro,
+        occurredOn: `${month}-${day}`,
+        amount: 100,
+        memo,
+        splits: [{ userId: users.taro, amount: 100 }],
+      });
+    }
+
+    await signedIn.setViewportSize({ width: 1280, height: 900 });
+    await signedIn.goto('/transactions');
+    const table = signedIn.getByTestId('tx-table');
+    const expectedTones = [
+      ['19日その1', 'tinted'],
+      ['19日その2', 'tinted'],
+      ['15日', 'plain'],
+      ['2日', 'tinted'],
+    ] as const;
+    for (const [memo, tone] of expectedTones) {
+      await expect(table.getByRole('row').filter({ hasText: memo })).toHaveAttribute(
+        'data-date-tone',
+        tone,
+      );
+    }
+    const desktopTinted = table.getByRole('row').filter({ hasText: '19日その1' });
+    const desktopPlain = table.getByRole('row').filter({ hasText: '15日' });
+    expect(await desktopTinted.evaluate((row) => getComputedStyle(row).backgroundColor)).not.toBe(
+      await desktopPlain.evaluate((row) => getComputedStyle(row).backgroundColor),
+    );
+
+    await signedIn.setViewportSize({ width: 375, height: 800 });
+    const cards = signedIn.getByTestId('tx-cards');
+    for (const [memo, tone] of expectedTones) {
+      await expect(cards.locator('li').filter({ hasText: memo })).toHaveAttribute(
+        'data-date-tone',
+        tone,
+      );
+    }
+    const mobileTinted = cards.locator('li').filter({ hasText: '19日その1' }).locator('section');
+    const mobilePlain = cards.locator('li').filter({ hasText: '15日' }).locator('section');
+    expect(await mobileTinted.evaluate((card) => getComputedStyle(card).backgroundColor)).not.toBe(
+      await mobilePlain.evaluate((card) => getComputedStyle(card).backgroundColor),
+    );
+  });
 });
