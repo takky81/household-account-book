@@ -20,6 +20,7 @@ import { ImportPage } from './features/transfer/ImportPage';
 import { ExportPage } from './features/transfer/ExportPage';
 import { SettingsPage } from './features/settings/SettingsPage';
 import { TagsPage } from './features/tags/TagsPage';
+import { SuppliesPage } from './features/supplies/SuppliesPage';
 import { applyTheme, loadTheme, resolveTheme } from './lib/theme';
 import { configError } from './lib/supabase';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -58,6 +59,7 @@ function Routed() {
           <Route path="/import" element={<ImportPage />} />
           <Route path="/export" element={<ExportPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/supplies" element={<SuppliesPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

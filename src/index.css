@@ -37,6 +37,9 @@
   --c-own-panel: #fdf3e3;
   --c-bar: #4a6fa5; /* 棒グラフ・予算バー */
   --c-bar-track: #dde7f5;
+  --c-supply: #704600; /* 不足物資があるときの帯 */
+  --c-supply-panel: #fff1b8;
+  --c-supply-shine: rgb(255 255 255 / 0.75);
 
   /* 円グラフのカテゴリ色。並び順は固定で、使い回さない */
   --c-cat-1: #2a78d6;
@@ -72,6 +75,9 @@
   --c-own-panel: #3a2f1a;
   --c-bar: #7fa6dd;
   --c-bar-track: #24354a;
+  --c-supply: #ffe08a;
+  --c-supply-panel: #493600;
+  --c-supply-shine: rgb(255 224 138 / 0.18);
 
   --c-cat-1: #3987e5;
   --c-cat-2: #d95926;
@@ -85,6 +91,50 @@
 body {
   background: var(--c-paper);
   color: var(--c-ink);
+}
+
+/* 不足があるときだけ、光が横切って帯がゆっくり明滅する。 */
+.supply-alert-active {
+  animation: supply-pulse 1.8s ease-in-out infinite;
+}
+
+.supply-alert-active::after {
+  position: absolute;
+  inset: -60% auto -60% -35%;
+  width: 24%;
+  content: '';
+  transform: rotate(18deg);
+  background: var(--c-supply-shine);
+  filter: blur(4px);
+  animation: supply-shine 2.2s ease-in-out infinite;
+}
+
+@keyframes supply-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--c-supply) 0%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0.75rem color-mix(in srgb, var(--c-supply) 32%, transparent);
+  }
+}
+
+@keyframes supply-shine {
+  0%,
+  25% {
+    left: -35%;
+  }
+  75%,
+  100% {
+    left: 120%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .supply-alert-active,
+  .supply-alert-active::after {
+    animation: none;
+  }
 }
 
 /*

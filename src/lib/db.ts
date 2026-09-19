@@ -49,6 +49,16 @@ export type Tag = {
   is_archived: boolean;
 };
 
+/** ログイン済みの全利用者で共有する不足物資（§3.5.2）。 */
+export type MissingSupply = {
+  id: string;
+  name: string;
+  is_purchased: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 /**
  * 共有範囲。取引・予算・定期登録ルールが持つ（§2.4）。
  * share_group_id が入っていれば共有、null なら個人で owner_id が入る。
@@ -196,6 +206,20 @@ export async function loadRecurringPostings(): Promise<RecurringPosting[]> {
   return (data ?? []) as RecurringPosting[];
 }
 
+export async function loadMissingSupplies(): Promise<MissingSupply[]> {
+  return fetchAll<MissingSupply>(async (from, to) => {
+    const { data, error, count } = await supabase
+      .from('missing_supplies')
+      .select('*', { count: 'exact' })
+      .order('is_purchased')
+      .order('created_at')
+      .order('id')
+      .range(from, to);
+    if (error !== null) throw new Error(error.message);
+    return { rows: (data ?? []) as MissingSupply[], total: count };
+  }, PAGE_SIZE);
+}
+
 // ------------------------------------------------------------------ 書き込み
 
 export type SaveTransaction = {
@@ -290,6 +314,24 @@ export async function runRecurringRules(): Promise<RecurringRunResult> {
   const { data, error } = await supabase.rpc('run_recurring_rules', { p_today: null });
   if (error !== null) throw new Error(error.message);
   return data as RecurringRunResult;
+}
+
+export async function createMissingSupply(name: string): Promise<void> {
+  const { error } = await supabase.from('missing_supplies').insert({ name: name.trim() });
+  if (error !== null) throw new Error(error.message);
+}
+
+export async function setMissingSupplyPurchased(id: string, isPurchased: boolean): Promise<void> {
+  const { error } = await supabase
+    .from('missing_supplies')
+    .update({ is_purchased: isPurchased })
+    .eq('id', id);
+  if (error !== null) throw new Error(error.message);
+}
+
+export async function deleteMissingSupply(id: string): Promise<void> {
+  const { error } = await supabase.from('missing_supplies').delete().eq('id', id);
+  if (error !== null) throw new Error(error.message);
 }
 
 export async function createCategory(input: {

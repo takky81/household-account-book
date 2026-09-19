@@ -31,6 +31,8 @@
         --c-own-panel: #fdf3e3;
         --c-bar: #4a6fa5;
         --c-bar-track: #dde7f5;
+        --c-supply: #704600;
+        --c-supply-panel: #fff1b8;
       }
 
       * { box-sizing: border-box; }
@@ -89,6 +91,9 @@
       .warn { color: var(--c-warn); }
       .warnbox { background: var(--c-warn-panel); border: 1px solid var(--c-warn); color: var(--c-warn);
                  border-radius: 6px; padding: 6px 8px; font-size: 11px; }
+      .supply-alert { background: var(--c-supply-panel); border: 1px solid var(--c-supply); color: var(--c-supply);
+                      border-radius: 8px; padding: 8px 10px; font-weight: bold; }
+      .supply-done { color: var(--c-muted); text-decoration: line-through; }
 
       .meter { height: 8px; background: var(--c-bar-track); border-radius: 999px; overflow: hidden; }
       .meter > span { display: block; height: 100%; background: var(--c-bar); }
@@ -148,6 +153,7 @@
         <div class="caption"><span>ホーム</span><span class="ref">§5.5 / §5.6</span></div>
         <div class="body">
           <div class="bar"><span>◀</span><strong>2026年8月</strong><span>▶</span></div>
+          <div class="supply-alert row"><span>✦ 不足物資　2件あります</span><span>›</span></div>
 
           <div class="card col">
             <div class="row"><span>収入</span><span class="amount income">+320,000</span></div>
@@ -190,6 +196,23 @@
           </div>
 
           <div class="btn">＋ 取引を入力</div>
+        </div>
+        <div class="nav"><span class="on">ホーム</span><span>入力</span><span>一覧</span><span>集計</span><span>予算</span></div>
+      </section>
+
+      <!-- ============================================ 不足物資 -->
+      <section class="frame mobile">
+        <div class="caption"><span>不足物資</span><span class="ref">決定表「不足物資」</span></div>
+        <div class="body">
+          <div class="row" style="justify-content: flex-start"><span style="color: var(--c-link)">← ホーム</span><strong>不足物資</strong></div>
+          <div class="card col">
+            <div class="row"><strong>▢ 買うもの</strong><span class="tag" style="background: var(--c-supply-panel); color: var(--c-supply)">残り 2件</span></div>
+            <div class="row"><span class="input placeholder grow">例：牛乳</span><span class="btn small">＋ 追加</span></div>
+            <div class="row"><span>○　トイレットペーパー</span><span class="muted">削除</span></div>
+            <div class="row"><span>○　食器用洗剤</span><span class="muted">削除</span></div>
+            <div class="row"><span class="supply-done">✓　お米</span><span><span class="muted">購入済み　</span><span class="muted">削除</span></span></div>
+          </div>
+          <div class="note">追加・購入済み・削除は、ログインしているすべてのメンバーに共有される</div>
         </div>
         <div class="nav"><span class="on">ホーム</span><span>入力</span><span>一覧</span><span>集計</span><span>予算</span></div>
       </section>

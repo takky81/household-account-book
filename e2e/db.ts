@@ -72,6 +72,7 @@ export async function resetData(): Promise<void> {
   const db = adminClient();
   const all = '00000000-0000-0000-0000-000000000000';
   for (const step of [
+    db.from('missing_supplies').delete().neq('id', all),
     db.from('transactions').delete().neq('id', all),
     db.from('recurring_rules').delete().neq('id', all),
     db.from('budgets').delete().neq('id', all),

@@ -12,6 +12,9 @@ import { aggregateMonth, monthDiff } from '../aggregate/aggregate';
 import { toAggregateTx, toBudgetTx } from '../app/model';
 import { buildBudgetRowsByScope } from '../budgets/usage';
 import { describeRecurringRun } from '../recurring/schedule';
+import { SupplyBanner } from '../supplies/SupplyBanner';
+import { missingCount } from '../supplies/model';
+import { useSupplies } from '../supplies/useSupplies';
 
 export function HomePage() {
   const workspace = useWorkspace();
@@ -21,6 +24,7 @@ export function HomePage() {
   const [current, setCurrent] = useState<Transaction[]>([]);
   const [previous, setPrevious] = useState<Transaction[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
+  const supplies = useSupplies();
 
   useEffect(() => {
     void (async () => {
@@ -80,6 +84,11 @@ export function HomePage() {
   return (
     <main className="mx-auto flex max-w-md flex-col gap-3 p-3">
       <MonthNav monthKey={monthKey} onChange={setMonthKey} />
+      <SupplyBanner
+        count={missingCount(supplies.items)}
+        loading={supplies.loading}
+        failed={supplies.error !== ''}
+      />
 
       {/* 起動時に作った取引を知らせる。黙って増やすと覚えのない取引に見える（§5.8） */}
       {recurring !== null && recurring.created + recurring.failed > 0 && (

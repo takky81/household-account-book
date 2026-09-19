@@ -75,6 +75,12 @@ const SOURCES: Record<string, string[]> = {
     'supabase/tests/10-tags.test.sql',
   ],
   タグの管理: ['e2e/tag.spec.ts', 'supabase/tests/10-tags.test.sql'],
+  不足物資: [
+    'src/features/supplies/model.test.ts',
+    'src/features/supplies/SupplyBanner.test.tsx',
+    'e2e/supplies.spec.ts',
+    'supabase/tests/11-missing-supplies.test.sql',
+  ],
   表示設定と共通の振る舞い: [
     'e2e/ui.spec.ts',
     'src/lib/theme.test.ts',
