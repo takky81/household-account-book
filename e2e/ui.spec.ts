@@ -275,4 +275,16 @@ test.describe('表示設定と共通の振る舞い', () => {
       await mobilePlain.evaluate((card) => getComputedStyle(card).backgroundColor),
     );
   });
+
+  test('列14 対象月は画面を移動しても維持される', async ({ signedIn }) => {
+    await signedIn.setViewportSize({ width: 1280, height: 900 });
+    await signedIn.goto('/');
+    await signedIn.getByRole('button', { name: '前の月' }).click();
+    const selectedMonth = await signedIn.getByTestId('month').textContent();
+
+    for (const pageName of ['一覧', '集計', '予算', 'ホーム']) {
+      await signedIn.getByRole('link', { name: pageName, exact: true }).click();
+      await expect(signedIn.getByTestId('month')).toHaveText(selectedMonth!);
+    }
+  });
 });

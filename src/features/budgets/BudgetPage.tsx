@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Card, ErrorText, Meter, Tabs } from '../../components/ui';
 import { MonthNav } from '../app/Layout';
-import { addMonths, currentMonthKey, monthStart } from '../../lib/date';
+import { addMonths, monthStart } from '../../lib/date';
 import { formatAmount, parseAmount } from '../../lib/money';
 import {
   deleteBudget,
@@ -21,12 +21,13 @@ import {
 import { useAuth, useWorkspace } from '../app/context';
 import { toBudgetTx } from '../app/model';
 import { budgetTotal, buildBudgetRowsByScope, copyBudgets, validateBudgetAmount } from './usage';
+import { useTargetMonth } from '../app/targetMonth';
 
 export function BudgetPage() {
   const workspace = useWorkspace();
   const { userId } = useAuth();
   const selfId = userId!;
-  const [monthKey, setMonthKey] = useState(currentMonthKey());
+  const { monthKey, setMonthKey } = useTargetMonth();
   /** 表に出す共有範囲。既定は先頭＝個人（§2.4） */
   const [scopeKeyValue, setScopeKeyValue] = useState(workspace.scopes[0]?.key ?? '');
   const [budgets, setBudgets] = useState<Budget[]>([]);

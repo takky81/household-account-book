@@ -14,7 +14,7 @@ import {
   TextInput,
 } from '../../components/ui';
 import { MonthNav } from '../app/Layout';
-import { currentMonthKey, formatDay, monthEnd, monthStart } from '../../lib/date';
+import { formatDay, monthEnd, monthStart } from '../../lib/date';
 import { formatAmount } from '../../lib/money';
 import { useNarrow } from '../../lib/useNarrow';
 import { cn } from '../../lib/utils';
@@ -38,6 +38,7 @@ import {
   type TransactionFilters,
 } from './filter';
 import { stripeDateGroups } from './dateStripe';
+import { useTargetMonth } from '../app/targetMonth';
 
 type ScopeFilterValue = 'all' | 'own' | string;
 
@@ -144,7 +145,7 @@ export function TransactionsPage() {
   const narrow = useNarrow();
   const { userId } = useAuth();
   const selfId = userId!;
-  const [monthKey, setMonthKey] = useState(currentMonthKey());
+  const { monthKey, setMonthKey } = useTargetMonth();
   const [rows, setRows] = useState<Transaction[]>([]);
   const [scope, setScope] = useState<ScopeFilterValue>('all');
   const [keyword, setKeyword] = useState('');

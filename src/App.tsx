@@ -25,6 +25,7 @@ import { applyTheme, loadTheme, resolveTheme } from './lib/theme';
 import { configError } from './lib/supabase';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Card, Note } from './components/ui';
+import { TargetMonthProvider } from './features/app/targetMonth';
 
 function Routed() {
   const { session, loading, userId } = useAuth();
@@ -42,27 +43,29 @@ function Routed() {
 
   return (
     <WorkspaceProvider userId={userId}>
-      <Routes>
-        {/* ログイン済みならログイン画面はホームへ送る（列6） */}
-        <Route path="/login" element={<Navigate to="/" replace />} />
-        <Route element={<Layout />}>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/new" element={<TransactionFormPage />} />
-          <Route path="/transactions" element={<TransactionsPage />} />
-          <Route path="/transactions/:id/edit" element={<TransactionFormPage />} />
-          <Route path="/aggregate" element={<AggregatePage />} />
-          <Route path="/budget" element={<BudgetPage />} />
-          <Route path="/categories" element={<CategoriesPage />} />
-          <Route path="/tags" element={<TagsPage />} />
-          <Route path="/groups" element={<GroupsPage />} />
-          <Route path="/recurring" element={<RecurringPage />} />
-          <Route path="/import" element={<ImportPage />} />
-          <Route path="/export" element={<ExportPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/supplies" element={<SuppliesPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Route>
-      </Routes>
+      <TargetMonthProvider>
+        <Routes>
+          {/* ログイン済みならログイン画面はホームへ送る（列6） */}
+          <Route path="/login" element={<Navigate to="/" replace />} />
+          <Route element={<Layout />}>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/new" element={<TransactionFormPage />} />
+            <Route path="/transactions" element={<TransactionsPage />} />
+            <Route path="/transactions/:id/edit" element={<TransactionFormPage />} />
+            <Route path="/aggregate" element={<AggregatePage />} />
+            <Route path="/budget" element={<BudgetPage />} />
+            <Route path="/categories" element={<CategoriesPage />} />
+            <Route path="/tags" element={<TagsPage />} />
+            <Route path="/groups" element={<GroupsPage />} />
+            <Route path="/recurring" element={<RecurringPage />} />
+            <Route path="/import" element={<ImportPage />} />
+            <Route path="/export" element={<ExportPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/supplies" element={<SuppliesPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
+        </Routes>
+      </TargetMonthProvider>
     </WorkspaceProvider>
   );
 }

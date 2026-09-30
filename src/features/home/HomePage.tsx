@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, Meter, ScopeTag } from '../../components/ui';
 import { MonthNav } from '../app/Layout';
-import { currentMonthKey, addMonths } from '../../lib/date';
+import { addMonths } from '../../lib/date';
 import { formatAmount, formatSigned } from '../../lib/money';
 import { loadBudgets, loadMonthTransactions, type Budget, type Transaction } from '../../lib/db';
 import { useAuth, useWorkspace } from '../app/context';
@@ -15,12 +15,13 @@ import { describeRecurringRun } from '../recurring/schedule';
 import { SupplyBanner } from '../supplies/SupplyBanner';
 import { missingCount } from '../supplies/model';
 import { useSupplies } from '../supplies/useSupplies';
+import { useTargetMonth } from '../app/targetMonth';
 
 export function HomePage() {
   const workspace = useWorkspace();
   const { userId } = useAuth();
   const selfId = userId!;
-  const [monthKey, setMonthKey] = useState(currentMonthKey());
+  const { monthKey, setMonthKey } = useTargetMonth();
   const [current, setCurrent] = useState<Transaction[]>([]);
   const [previous, setPrevious] = useState<Transaction[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);

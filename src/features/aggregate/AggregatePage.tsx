@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Card, Select, Tabs } from '../../components/ui';
 import { MonthNav } from '../app/Layout';
-import { addMonths, currentMonthKey } from '../../lib/date';
+import { addMonths } from '../../lib/date';
 import { formatAmount } from '../../lib/money';
 import { loadTransactions, type Transaction } from '../../lib/db';
 import { monthEnd, monthStart } from '../../lib/date';
@@ -18,6 +18,7 @@ import {
   type Slice,
 } from './aggregate';
 import { toAggregateTx } from '../app/model';
+import { useTargetMonth } from '../app/targetMonth';
 
 const MONTHS_IN_CHART = 6;
 
@@ -25,7 +26,7 @@ export function AggregatePage() {
   const workspace = useWorkspace();
   const { userId } = useAuth();
   const selfId = userId!;
-  const [monthKey, setMonthKey] = useState(currentMonthKey());
+  const { monthKey, setMonthKey } = useTargetMonth();
   const [scopeValue, setScopeValue] = useState<'all' | 'own' | string>('all');
   const [basis, setBasis] = useState<Basis>('burden');
   const [tagId, setTagId] = useState('');
