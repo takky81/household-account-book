@@ -112,6 +112,7 @@ test.describe('表示設定と共通の振る舞い', () => {
     await signedIn.setViewportSize({ width: 1280, height: 900 });
     await expect(signedIn.getByTestId('tx-table')).toBeVisible();
     await expect(signedIn.getByTestId('tx-cards')).toHaveCount(0);
+    await expect(signedIn.locator('main')).toHaveCSS('max-width', '1152px');
   });
 
   test('列9 削除を押すとまず確認ダイアログが出て、その時点では消えない', async ({

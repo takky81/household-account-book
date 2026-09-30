@@ -273,7 +273,7 @@ export function TransactionsPage() {
   }
 
   return (
-    <main className="mx-auto flex max-w-3xl flex-col gap-3 p-3">
+    <main className="mx-auto flex max-w-3xl flex-col gap-3 p-3 md:max-w-6xl">
       <h1 className="text-lg font-bold">取引一覧</h1>
       <MonthNav monthKey={monthKey} onChange={changeMonth} />
 
