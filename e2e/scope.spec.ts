@@ -54,7 +54,7 @@ test.describe('共有範囲の変更', () => {
       .getByRole('group', { name: '共有範囲' })
       .getByRole('button', { name: '夫婦' })
       .click();
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '外食' });
+    await signedIn.getByLabel('大カテゴリ').selectOption({ label: '外食' });
     // 移動先の既定割合が先に画面へ出る
     await expect(signedIn.getByLabel('taroの負担')).toHaveValue('500');
     await signedIn.getByRole('button', { name: '保存', exact: true }).click();

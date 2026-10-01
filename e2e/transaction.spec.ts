@@ -34,7 +34,7 @@ test.describe('取引の入力と編集', () => {
     await seedTag('家族', '#f97316');
 
     await signedIn.goto('/new');
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '交通費' });
+    await signedIn.getByLabel('大カテゴリ').selectOption({ label: '交通費' });
     await signedIn.getByLabel('金額').fill('1200');
     await signedIn.getByRole('checkbox', { name: '旅行', exact: true }).check();
     await signedIn.getByRole('checkbox', { name: '家族', exact: true }).check();
@@ -97,7 +97,7 @@ test.describe('取引の入力と編集', () => {
     await signedIn.getByRole('group', { name: '共有範囲' })
       .getByRole('button', { name: '夫婦' })
       .click();
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '家賃' });
+    await signedIn.getByLabel('大カテゴリ').selectOption({ label: '家賃' });
     await signedIn.getByLabel('金額').fill('1001');
     await signedIn.getByRole('button', { name: '保存', exact: true }).click();
 
@@ -111,7 +111,7 @@ test.describe('取引の入力と編集', () => {
     await seedCategory({ name: '食費' });
 
     await signedIn.goto('/new');
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '食費' });
+    await signedIn.getByLabel('大カテゴリ').selectOption({ label: '食費' });
     await signedIn.getByLabel('金額').fill('780');
     await signedIn.getByRole('button', { name: '保存', exact: true }).click();
 
@@ -127,7 +127,7 @@ test.describe('取引の入力と編集', () => {
     await seedCategory({ name: '日用品' });
 
     await signedIn.goto('/new');
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '日用品' });
+    await signedIn.getByLabel('大カテゴリ').selectOption({ label: '日用品' });
     await signedIn.getByLabel('金額').fill('780');
     // 既定は個人なので出ない
     await expect(signedIn.getByLabel('taroの負担')).toHaveCount(0);
@@ -147,7 +147,7 @@ test.describe('取引の入力と編集', () => {
     await signedIn.getByRole('group', { name: '共有範囲' })
       .getByRole('button', { name: '夫婦' })
       .click();
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '家賃' });
+    await signedIn.getByLabel('大カテゴリ').selectOption({ label: '家賃' });
     await signedIn.getByLabel('金額').fill('1000');
     await signedIn.getByLabel('taroの負担').fill('700');
     await signedIn.getByLabel('hanaの負担').fill('300');
@@ -175,7 +175,7 @@ test.describe('取引の入力と編集', () => {
     await signedIn.getByRole('group', { name: '共有範囲' })
       .getByRole('button', { name: '夫婦' })
       .click();
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '家賃' });
+    await signedIn.getByLabel('大カテゴリ').selectOption({ label: '家賃' });
     await signedIn.getByLabel('金額').fill('1000');
     await signedIn.getByLabel('taroの負担').fill('100');
     await signedIn.getByRole('button', { name: '保存', exact: true }).click();
@@ -250,7 +250,7 @@ test.describe('取引の入力と編集', () => {
     await seedCategory({ name: '食費' });
 
     await signedIn.goto('/new');
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '食費' });
+    await signedIn.getByLabel('大カテゴリ').selectOption({ label: '食費' });
     await signedIn.getByLabel('金額').fill('780');
     await signedIn.getByLabel('備考').fill('昼食');
     await signedIn.getByRole('button', { name: '保存して続けて入力' }).click();
@@ -258,7 +258,7 @@ test.describe('取引の入力と編集', () => {
     await expect(signedIn.getByText('保存しました')).toBeVisible();
     await expect(signedIn.getByLabel('金額')).toHaveValue('');
     await expect(signedIn.getByLabel('備考')).toHaveValue('');
-    await expect(signedIn.getByLabel('カテゴリ')).not.toHaveValue('');
+    await expect(signedIn.getByLabel('大カテゴリ')).not.toHaveValue('');
     await expect(signedIn.getByLabel('金額')).toBeFocused();
   });
 
@@ -288,7 +288,7 @@ test.describe('取引の入力と編集', () => {
     await seedCategory({ name: '外食' });
 
     await signedIn.goto('/new');
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '外食' });
+    await signedIn.getByLabel('大カテゴリ').selectOption({ label: '外食' });
     await signedIn.getByLabel('金額').fill('1200+800');
     await expect(signedIn.getByText('= 2,000')).toBeVisible();
 
@@ -301,7 +301,7 @@ test.describe('取引の入力と編集', () => {
     await seedCategory({ name: '交通費' });
 
     await signedIn.goto('/new');
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '交通費' });
+    await signedIn.getByLabel('大カテゴリ').selectOption({ label: '交通費' });
     await signedIn.getByLabel('金額').fill('420');
     await signedIn.getByRole('button', { name: '×' }).click();
     await signedIn.getByLabel('金額').pressSequentially('3');
@@ -313,7 +313,7 @@ test.describe('取引の入力と編集', () => {
     await seedCategory({ name: '日用品' });
 
     await signedIn.goto('/new');
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '日用品' });
+    await signedIn.getByLabel('大カテゴリ').selectOption({ label: '日用品' });
     // iPhone の数字キーボードには演算子が無いので、小数点だけで税込を打てるようにしてある
     await signedIn.getByLabel('金額').fill('1980.5');
     await expect(signedIn.getByText('= 1,981（四捨五入）')).toBeVisible();
@@ -327,7 +327,7 @@ test.describe('取引の入力と編集', () => {
     await seedCategory({ name: '雑貨' });
 
     await signedIn.goto('/new');
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '雑貨' });
+    await signedIn.getByLabel('大カテゴリ').selectOption({ label: '雑貨' });
     await signedIn.getByLabel('金額').fill('1200+');
     // 入力の途中で責めない。計算できないと出すのは保存を押してから
     await expect(signedIn.getByText('計算できません', { exact: true })).toBeHidden();
@@ -347,7 +347,7 @@ test.describe('取引の入力と編集', () => {
     await seedCategory({ name: '外食', parentId: parent });
 
     await signedIn.goto('/new');
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '食費' });
+    await signedIn.getByLabel('大カテゴリ').selectOption({ label: '食費' });
     await signedIn.getByLabel('金額').fill('500');
     await signedIn.getByRole('button', { name: '保存', exact: true }).click();
 
@@ -369,7 +369,8 @@ test.describe('取引の入力と編集', () => {
     await signedIn.getByRole('group', { name: '共有範囲' })
       .getByRole('button', { name: '夫婦' })
       .click();
-    await signedIn.getByLabel('カテゴリ').selectOption({ label: '食費 / 外食' });
+    await signedIn.getByLabel('大カテゴリ').selectOption({ label: '食費' });
+    await signedIn.getByLabel('小カテゴリ').selectOption({ label: '外食' });
     await signedIn.getByLabel('金額').fill('1000');
     // 共有範囲は取引が持つ（§2.4）。小分類を選んでも「夫婦」のままで、
     // 負担は夫婦の既定割合で按分される
@@ -389,5 +390,44 @@ test.describe('取引の入力と編集', () => {
     };
     expect(saved.category_id).toBe(child);
     expect(saved.transaction_splits.map((s) => s.amount).sort()).toEqual([500, 500]);
+  });
+
+  test('列23 大カテゴリを選ぶと小カテゴリをその配下だけから選べる', async ({ signedIn }) => {
+    const food = await seedCategory({ name: '食費' });
+    const transport = await seedCategory({ name: '交通費' });
+    await seedCategory({ name: '外食', parentId: food });
+    await seedCategory({ name: '電車', parentId: transport });
+
+    await signedIn.goto('/new');
+    const roots = signedIn.getByLabel('大カテゴリ');
+    const children = signedIn.getByLabel('小カテゴリ');
+
+    // 大カテゴリには小カテゴリを混ぜない。
+    await expect(roots).toContainText('食費');
+    await expect(roots).toContainText('交通費');
+    await expect(roots).not.toContainText('外食');
+    await expect(roots).not.toContainText('電車');
+
+    await roots.selectOption({ label: '食費' });
+    await expect(children).toContainText('外食');
+    await expect(children).not.toContainText('電車');
+    await children.selectOption({ label: '外食' });
+
+    // 大カテゴリを変えると前の小カテゴリを引き継がず、大カテゴリ自体を選んだ状態になる。
+    await roots.selectOption({ label: '交通費' });
+    await expect(children).toHaveValue('');
+    await expect(children).toContainText('電車');
+    await expect(children).not.toContainText('外食');
+
+    await signedIn.getByLabel('金額').fill('420');
+    await signedIn.getByRole('button', { name: '保存', exact: true }).click();
+    await expect(signedIn.getByRole('heading', { name: '取引一覧' })).toBeVisible();
+    const { data, error } = await adminClient()
+      .from('transactions')
+      .select('category_id')
+      .eq('amount', 420)
+      .single();
+    if (error !== null) throw error;
+    expect((data as { category_id: string }).category_id).toBe(transport);
   });
 });

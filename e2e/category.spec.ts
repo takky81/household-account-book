@@ -40,8 +40,8 @@ test.describe('カテゴリの管理', () => {
 
     // 取引の入力では共有範囲の接頭辞なしで選べる
     await signedIn.goto('/new');
-    await expect(signedIn.getByLabel('カテゴリ')).toContainText('家賃');
-    const options = await signedIn.getByLabel('カテゴリ').locator('option').allTextContents();
+    await expect(signedIn.getByLabel('大カテゴリ')).toContainText('家賃');
+    const options = await signedIn.getByLabel('大カテゴリ').locator('option').allTextContents();
     expect(options.some((text) => text.includes(' / 家賃'))).toBe(false);
   });
 
@@ -90,7 +90,7 @@ test.describe('カテゴリの管理', () => {
 
     // 新規入力の候補から外れる
     await signedIn.goto('/new');
-    await expect(signedIn.getByLabel('カテゴリ')).not.toContainText('趣味');
+    await expect(signedIn.getByLabel('大カテゴリ')).not.toContainText('趣味');
 
     // 既存の取引は残り、集計にも出る
     await signedIn.goto('/transactions');
@@ -271,7 +271,7 @@ test.describe('カテゴリの管理', () => {
 
     // 入力の候補も同じ順で並ぶ
     await signedIn.goto('/new');
-    const select = signedIn.getByLabel('カテゴリ');
+    const select = signedIn.getByLabel('大カテゴリ');
     await expect(select).toContainText('食費');
     const options = await select.locator('option').allTextContents();
     const at = (name: string) => options.findIndex((text) => text.includes(name));
@@ -295,9 +295,10 @@ test.describe('カテゴリの管理', () => {
     // 引き継ぐのは収支区分だけ（共有範囲はカテゴリが持たない）
     expect(data).toEqual({ parent_id: parent, kind: 'expense' });
 
-    // 取引の入力では『大分類 / 小分類』で選べる
+    // 取引の入力では大カテゴリを選ぶと、その配下だけを小カテゴリに出す
     await signedIn.goto('/new');
-    await expect(signedIn.getByLabel('カテゴリ')).toContainText('食費 / 外食');
+    await signedIn.getByLabel('大カテゴリ').selectOption({ label: '食費' });
+    await expect(signedIn.getByLabel('小カテゴリ')).toContainText('外食');
   });
 
   test('列27 小分類を別の大分類へ付け替えられる', async ({ signedIn }) => {
@@ -319,7 +320,8 @@ test.describe('カテゴリの管理', () => {
       return (data as { parent_id: string }).parent_id;
     }).toBe(party);
     await signedIn.goto('/new');
-    await expect(signedIn.getByLabel('カテゴリ')).toContainText('交際費 / 外食');
+    await signedIn.getByLabel('大カテゴリ').selectOption({ label: '交際費' });
+    await expect(signedIn.getByLabel('小カテゴリ')).toContainText('外食');
   });
 
   test('列20 小分類を削除すると取引が親へ移る', async ({ signedIn, users }) => {
@@ -385,8 +387,8 @@ test.describe('カテゴリの管理', () => {
 
     // それでも新規入力の候補からは外れる
     await signedIn.goto('/new');
-    await expect(signedIn.getByLabel('カテゴリ')).not.toContainText('外食');
-    await expect(signedIn.getByLabel('カテゴリ')).not.toContainText('食費');
+    await expect(signedIn.getByLabel('大カテゴリ')).not.toContainText('食費');
+    await expect(signedIn.getByLabel('小カテゴリ')).not.toContainText('外食');
   });
 
   test('列23 小分類は同じ親の中で並べ替わる', async ({ signedIn }) => {
@@ -407,7 +409,8 @@ test.describe('カテゴリの管理', () => {
     expect((await categoryOf('食費')).sort_order).toBe(10);
 
     await signedIn.goto('/new');
-    const select = signedIn.getByLabel('カテゴリ');
+    await signedIn.getByLabel('大カテゴリ').selectOption({ label: '食費' });
+    const select = signedIn.getByLabel('小カテゴリ');
     await expect(select).toContainText('外食');
     const options = await select.locator('option').allTextContents();
     const at = (name: string) => options.findIndex((text) => text.includes(name));
