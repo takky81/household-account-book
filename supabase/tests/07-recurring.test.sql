@@ -5,7 +5,12 @@
 -- 決定表: 定期登録ルールの管理 列1・列2・列3・列4・列5・列6・列7・列8・列9
 -- 決定表: 定期登録の生成 列1・列2・列3・列4・列5・列6・列7・列8・列9・列10・列11・列12・列13・列14・列15
 begin;
-select plan(30);
+select plan(31);
+
+select is(
+  private.local_date('2026-09-30 15:00:00+00'::timestamptz), '2026-10-01'::date,
+  '定期登録の生成 列1 UTCでは前日でも日本時間の今日を使う'
+);
 
 -- 予定日の丸め。ロールを切り替える前に private の関数を直接確かめる（§5.8）
 select is(
@@ -26,10 +31,10 @@ values
 
 -- 対象月の基準。今日が何日でも支払日1日の予定は必ず期日を過ぎている
 create temp table cal as select
-  date_trunc('month', current_date)::date as m0,
-  (date_trunc('month', current_date) - interval '1 month')::date as m1,
-  (date_trunc('month', current_date) - interval '2 months')::date as m2,
-  (date_trunc('month', current_date) + interval '1 month')::date as mn;
+  date_trunc('month', private.local_date(current_timestamp))::date as m0,
+  (date_trunc('month', private.local_date(current_timestamp)) - interval '1 month')::date as m1,
+  (date_trunc('month', private.local_date(current_timestamp)) - interval '2 months')::date as m2,
+  (date_trunc('month', private.local_date(current_timestamp)) + interval '1 month')::date as mn;
 
 grant select on cal to authenticated;
 

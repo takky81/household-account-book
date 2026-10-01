@@ -309,7 +309,7 @@ export async function deleteRecurringRule(id: string): Promise<void> {
   if (error !== null) throw new Error(error.message);
 }
 
-/** 期日の来た定期登録を取引にする（§5.8）。今日は DB 側の current_date で決まる。 */
+/** 期日の来た定期登録を取引にする（§5.8）。今日は DB 側で日本時間から決める。 */
 export async function runRecurringRules(): Promise<RecurringRunResult> {
   const { data, error } = await supabase.rpc('run_recurring_rules', { p_today: null });
   if (error !== null) throw new Error(error.message);
