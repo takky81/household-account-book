@@ -430,4 +430,20 @@ test.describe('取引の入力と編集', () => {
     if (error !== null) throw error;
     expect((data as { category_id: string }).category_id).toBe(transport);
   });
+
+  test('列24 共有範囲は囲みと大きなボタンで強調する', async ({ signedIn, users }) => {
+    await seedGroup(users);
+    await signedIn.setViewportSize({ width: 375, height: 800 });
+    await signedIn.goto('/new');
+
+    const chooser = signedIn.getByRole('group', { name: '共有範囲' });
+    await expect(chooser).toHaveCSS('border-top-width', '2px');
+
+    for (const button of await chooser.getByRole('button').all()) {
+      const box = await button.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.height).toBeGreaterThanOrEqual(44);
+      await expect(button).toHaveCSS('font-weight', '700');
+    }
+  });
 });

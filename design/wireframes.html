@@ -81,6 +81,8 @@
       .tabs { display: flex; gap: 4px; }
       .tab { border: 1px solid var(--c-edge); border-radius: 999px; padding: 3px 10px; font-size: 11px; background: var(--c-panel); }
       .tab.on { background: var(--c-ink); color: var(--c-paper); border-color: var(--c-ink); }
+      .scope-choice { gap: 8px; padding: 8px; border: 2px solid var(--c-edge); border-radius: 8px; background: var(--c-subtle); box-shadow: 0 1px 2px rgb(19 42 69 / .12); }
+      .scope-choice .tab { flex: 1; min-height: 44px; border-radius: 6px; padding: 8px 16px; font-size: 13px; font-weight: 700; }
 
       .tag { border-radius: 999px; padding: 1px 8px; font-size: 11px; white-space: nowrap; }
       .tag.shared { background: var(--c-shared-panel); color: var(--c-shared); }
@@ -227,7 +229,7 @@
 
           <div class="field"><label>日付</label><div class="input">2026-08-31</div></div>
 
-          <div class="field"><label>共有範囲</label><div class="tabs"><span class="tab">個人</span><span class="tab on">夫婦</span></div></div>
+          <div class="field"><label>共有範囲</label><div class="tabs scope-choice"><span class="tab">個人</span><span class="tab on">夫婦</span></div></div>
           <div class="row">
             <div class="field grow"><label>大カテゴリ</label><div class="input">食費⌄</div></div>
             <div class="field grow"><label>小カテゴリ（任意）</label><div class="input">外食⌄</div></div>

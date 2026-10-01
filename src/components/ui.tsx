@@ -183,14 +183,25 @@ export function Tabs<T extends string>({
   options,
   onChange,
   label,
+  prominent = false,
 }: {
   value: T;
   options: { value: T; label: string }[];
   onChange: (value: T) => void;
   label?: string;
+  /** 重要な選択に使う、大きなボタンと囲みを持つ表示。 */
+  prominent?: boolean;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-1" role="group" aria-label={label}>
+    <div
+      className={cn(
+        'flex flex-wrap items-center gap-1',
+        prominent &&
+          'gap-2 rounded-lg border-2 border-[var(--c-edge)] bg-[var(--c-subtle)] p-2 shadow-sm',
+      )}
+      role="group"
+      aria-label={label}
+    >
       {options.map((option) => (
         <button
           key={option.value}
@@ -198,7 +209,10 @@ export function Tabs<T extends string>({
           aria-pressed={option.value === value}
           onClick={() => onChange(option.value)}
           className={cn(
-            'rounded-full border px-3 py-0.5 text-xs',
+            'border',
+            prominent
+              ? 'min-h-11 min-w-24 flex-1 rounded-md px-4 py-2 text-sm font-bold shadow-sm'
+              : 'rounded-full px-3 py-0.5 text-xs',
             option.value === value
               ? 'border-[var(--c-ink)] bg-[var(--c-ink)] text-[var(--c-paper)]'
               : 'border-[var(--c-edge)] bg-[var(--c-panel)]',

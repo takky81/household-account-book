@@ -298,6 +298,7 @@ export function TransactionFormPage() {
       <FieldGroup label="共有範囲">
         <Tabs
           label="共有範囲"
+          prominent
           value={scopeKeyValue}
           onChange={(next) => {
             setScopeKeyValue(next);
