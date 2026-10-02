@@ -244,7 +244,7 @@ test.describe('取引の入力と編集', () => {
     expect(splits).toEqual([]);
   });
 
-  test('列13 保存して続けて入力すると日付とカテゴリが残り金額が空になる', async ({
+  test('列13 続けて入力すると日付とカテゴリが残り金額が空になる', async ({
     signedIn,
   }) => {
     await seedCategory({ name: '食費' });
@@ -253,7 +253,7 @@ test.describe('取引の入力と編集', () => {
     await signedIn.getByLabel('大カテゴリ').selectOption({ label: '食費' });
     await signedIn.getByLabel('金額').fill('780');
     await signedIn.getByLabel('備考').fill('昼食');
-    await signedIn.getByRole('button', { name: '保存して続けて入力' }).click();
+    await signedIn.getByRole('button', { name: '続けて入力' }).click();
 
     await expect(signedIn.getByText('保存しました')).toBeVisible();
     await expect(signedIn.getByLabel('金額')).toHaveValue('');
@@ -278,7 +278,7 @@ test.describe('取引の入力と編集', () => {
     await expect(signedIn.getByLabel('備考')).toHaveValue('直す取引');
 
     // 押せると同じ取引を上書きし続けてしまうので出さない
-    await expect(signedIn.getByRole('button', { name: '保存して続けて入力' })).toBeHidden();
+    await expect(signedIn.getByRole('button', { name: '続けて入力' })).toBeHidden();
     await expect(signedIn.getByRole('button', { name: '保存', exact: true })).toBeVisible();
   });
 
@@ -431,19 +431,41 @@ test.describe('取引の入力と編集', () => {
     expect((data as { category_id: string }).category_id).toBe(transport);
   });
 
-  test('列24 共有範囲は囲みと大きなボタンで強調する', async ({ signedIn, users }) => {
+  test('列24 共有範囲は保存操作と同じ見た目と大きさにする', async ({ signedIn, users }) => {
     await seedGroup(users);
     await signedIn.setViewportSize({ width: 375, height: 800 });
     await signedIn.goto('/new');
 
     const chooser = signedIn.getByRole('group', { name: '共有範囲' });
-    await expect(chooser).toHaveCSS('border-top-width', '2px');
+    const save = signedIn.getByRole('button', { name: '保存', exact: true });
+    const continueButton = signedIn.getByRole('button', { name: '続けて入力' });
+    const own = chooser.getByRole('button', { name: '個人' });
+    const shared = chooser.getByRole('button', { name: '夫婦' });
 
-    for (const button of await chooser.getByRole('button').all()) {
-      const box = await button.boundingBox();
-      expect(box).not.toBeNull();
-      expect(box!.height).toBeGreaterThanOrEqual(44);
-      await expect(button).toHaveCSS('font-weight', '700');
+    await expect(own).toHaveCSS(
+      'background-color',
+      await save.evaluate((el) => getComputedStyle(el).backgroundColor),
+    );
+    await expect(shared).toHaveCSS(
+      'border-color',
+      await continueButton.evaluate((el) => getComputedStyle(el).borderColor),
+    );
+    expect((await own.boundingBox())!.height).toBe((await save.boundingBox())!.height);
+    expect((await shared.boundingBox())!.height).toBe((await continueButton.boundingBox())!.height);
+  });
+
+  test('列25 必須項目のラベルを任意項目より目立たせる', async ({ signedIn }) => {
+    await signedIn.goto('/new');
+
+    const labels = ['日付', '共有範囲', '大カテゴリ', '金額'];
+    for (const name of labels) {
+      const label = signedIn.getByText(name, { exact: true }).first();
+      await expect(label).toHaveCSS('font-weight', '700');
+      await expect(label).toHaveCSS('font-size', '14px');
     }
+
+    const optional = signedIn.getByText('小カテゴリ（任意）', { exact: true });
+    await expect(optional).toHaveCSS('font-weight', '400');
+    await expect(optional).toHaveCSS('font-size', '12px');
   });
 });

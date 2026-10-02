@@ -71,6 +71,7 @@
 
       .field { display: flex; flex-direction: column; gap: 3px; }
       .field > label { font-size: 11px; color: var(--c-muted); }
+      .field > label.required { font-size: 13px; color: var(--c-ink); font-weight: 700; }
       .input { border: 1px solid var(--c-edge); border-radius: 6px; background: var(--c-panel);
                padding: 6px 8px; min-height: 30px; display: flex; align-items: center; }
       .input.placeholder { color: var(--c-muted); }
@@ -81,9 +82,6 @@
       .tabs { display: flex; gap: 4px; }
       .tab { border: 1px solid var(--c-edge); border-radius: 999px; padding: 3px 10px; font-size: 11px; background: var(--c-panel); }
       .tab.on { background: var(--c-ink); color: var(--c-paper); border-color: var(--c-ink); }
-      .scope-choice { gap: 8px; padding: 8px; border: 2px solid var(--c-edge); border-radius: 8px; background: var(--c-subtle); box-shadow: 0 1px 2px rgb(19 42 69 / .12); }
-      .scope-choice .tab { flex: 1; min-height: 44px; border-radius: 6px; padding: 8px 16px; font-size: 13px; font-weight: 700; }
-
       .tag { border-radius: 999px; padding: 1px 8px; font-size: 11px; white-space: nowrap; }
       .tag.shared { background: var(--c-shared-panel); color: var(--c-shared); }
       .tag.own { background: var(--c-own-panel); color: var(--c-own); }
@@ -227,15 +225,15 @@
         <div class="body">
           <div class="tabs"><span class="tab on">支出</span><span class="tab">収入</span></div>
 
-          <div class="field"><label>日付</label><div class="input">2026-08-31</div></div>
+          <div class="field"><label class="required">日付</label><div class="input">2026-08-31</div></div>
 
-          <div class="field"><label>共有範囲</label><div class="tabs scope-choice"><span class="tab">個人</span><span class="tab on">夫婦</span></div></div>
+          <div class="field"><label class="required">共有範囲</label><div class="row"><span class="btn ghost grow">個人</span><span class="btn grow">夫婦</span></div></div>
           <div class="row">
-            <div class="field grow"><label>大カテゴリ</label><div class="input">食費⌄</div></div>
+            <div class="field grow"><label class="required">大カテゴリ</label><div class="input">食費⌄</div></div>
             <div class="field grow"><label>小カテゴリ（任意）</label><div class="input">外食⌄</div></div>
           </div>
 
-          <div class="field"><label>金額</label><div class="input amount" style="font-size: 20px">4,200</div></div>
+          <div class="field"><label class="required">金額</label><div class="input amount" style="font-size: 20px">4,200</div></div>
 
           <div class="field">
             <label>支払者</label>
@@ -254,7 +252,7 @@
           <div class="field"><label>タグ（複数選択）</label><div><span class="tag shared">旅行 ✓</span> <span class="tag own">家族</span></div></div>
 
           <div class="row">
-            <div class="btn ghost grow">保存して続けて入力</div>
+            <div class="btn ghost grow">続けて入力</div>
             <div class="btn grow">保存</div>
           </div>
         </div>

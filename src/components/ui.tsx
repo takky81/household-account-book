@@ -111,14 +111,25 @@ export function Field({
   label,
   children,
   hint,
+  required = false,
 }: {
   label: string;
   children: ReactNode;
   hint?: ReactNode;
+  /** 必須項目のラベルを、任意項目より強く表示する。 */
+  required?: boolean;
 }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-xs text-[var(--c-muted)]">{label}</span>
+      <span
+        className={cn(
+          required
+            ? 'text-sm font-bold text-[var(--c-ink)]'
+            : 'text-xs text-[var(--c-muted)]',
+        )}
+      >
+        {label}
+      </span>
       {children}
       {hint !== undefined && <span className="text-xs text-[var(--c-muted)]">{hint}</span>}
     </label>
@@ -130,10 +141,27 @@ export function Field({
  * Field は <label> なので、中の最初のボタンにラベルの文字が名前として移ってしまい、
  * 「共有範囲 共有範囲」のような読み上げ名になる。
  */
-export function FieldGroup({ label, children }: { label: string; children: ReactNode }) {
+export function FieldGroup({
+  label,
+  children,
+  required = false,
+}: {
+  label: string;
+  children: ReactNode;
+  /** 必須項目のラベルを、任意項目より強く表示する。 */
+  required?: boolean;
+}) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-xs text-[var(--c-muted)]">{label}</span>
+      <span
+        className={cn(
+          required
+            ? 'text-sm font-bold text-[var(--c-ink)]'
+            : 'text-xs text-[var(--c-muted)]',
+        )}
+      >
+        {label}
+      </span>
       {children}
     </div>
   );
@@ -183,21 +211,20 @@ export function Tabs<T extends string>({
   options,
   onChange,
   label,
-  prominent = false,
+  actionButtons = false,
 }: {
   value: T;
   options: { value: T; label: string }[];
   onChange: (value: T) => void;
   label?: string;
-  /** 重要な選択に使う、大きなボタンと囲みを持つ表示。 */
-  prominent?: boolean;
+  /** 保存アクションと同じ見た目・寸法のボタンで表示する。 */
+  actionButtons?: boolean;
 }) {
   return (
     <div
       className={cn(
         'flex flex-wrap items-center gap-1',
-        prominent &&
-          'gap-2 rounded-lg border-2 border-[var(--c-edge)] bg-[var(--c-subtle)] p-2 shadow-sm',
+        actionButtons && 'gap-2',
       )}
       role="group"
       aria-label={label}
@@ -209,13 +236,14 @@ export function Tabs<T extends string>({
           aria-pressed={option.value === value}
           onClick={() => onChange(option.value)}
           className={cn(
-            'border',
-            prominent
-              ? 'min-h-11 min-w-24 flex-1 rounded-md px-4 py-2 text-sm font-bold shadow-sm'
-              : 'rounded-full px-3 py-0.5 text-xs',
+            actionButtons
+              ? 'flex-1 rounded-md px-3 py-1.5 text-sm'
+              : 'rounded-full border px-3 py-0.5 text-xs',
             option.value === value
-              ? 'border-[var(--c-ink)] bg-[var(--c-ink)] text-[var(--c-paper)]'
-              : 'border-[var(--c-edge)] bg-[var(--c-panel)]',
+              ? actionButtons
+                ? 'border border-transparent bg-[var(--c-ink)] text-[var(--c-paper)]'
+                : 'border-[var(--c-ink)] bg-[var(--c-ink)] text-[var(--c-paper)]'
+              : 'border border-[var(--c-edge)] bg-[var(--c-panel)]',
           )}
         >
           {option.label}

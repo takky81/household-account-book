@@ -281,7 +281,7 @@ export function TransactionFormPage() {
         ]}
       />
 
-      <Field label="日付">
+      <Field label="日付" required>
         <div className="flex items-center gap-2">
           <TextInput
             type="date"
@@ -295,10 +295,10 @@ export function TransactionFormPage() {
       </Field>
 
       {/* 共有範囲はカテゴリと別に選ぶ。既定は個人（§2.4） */}
-      <FieldGroup label="共有範囲">
+      <FieldGroup label="共有範囲" required>
         <Tabs
           label="共有範囲"
-          prominent
+          actionButtons
           value={scopeKeyValue}
           onChange={(next) => {
             setScopeKeyValue(next);
@@ -309,7 +309,7 @@ export function TransactionFormPage() {
       </FieldGroup>
 
       <div className="grid grid-cols-2 gap-2">
-        <Field label="大カテゴリ">
+        <Field label="大カテゴリ" required>
           <select
             aria-label="大カテゴリ"
             className="min-w-0 rounded-md border border-[var(--c-edge)] bg-[var(--c-panel)] px-2 py-1.5 text-sm"
@@ -354,7 +354,7 @@ export function TransactionFormPage() {
         </Field>
       </div>
 
-      <Field label="金額" hint={amountHint}>
+      <Field label="金額" hint={amountHint} required>
         <TextInput
           ref={amountRef}
           // iPhone の数字キーボードに小数点を出すため（列16）。演算子は下のボタンで入れる
@@ -477,7 +477,7 @@ export function TransactionFormPage() {
         {/* 続けて入力できるのは新規のときだけ。編集で押すと同じ取引を上書きし続けてしまう */}
         {id === undefined && (
           <Button variant="ghost" className="flex-1" disabled={busy} onClick={() => void save(true)}>
-            保存して続けて入力
+            続けて入力
           </Button>
         )}
         <Button className="flex-1" disabled={busy} onClick={() => void save(false)}>
