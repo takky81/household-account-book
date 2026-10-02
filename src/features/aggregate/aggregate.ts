@@ -262,3 +262,86 @@ export function categorySlices(rows: CategoryTotal[]): Slice[] {
   }
   return slices;
 }
+
+export type MonthlyCategoryInput = {
+  key: string;
+  rows: CategoryTotal[];
+};
+
+export type MonthlyCategorySeries = {
+  /** 大分類のID。まとめた分は other。 */
+  key: string;
+  name: string;
+  /** --c-cat-n の n。カテゴリ別内訳と同じ番号を使う。 */
+  colorIndex: number;
+};
+
+export type MonthlyCategoryBar = {
+  key: string;
+  total: number;
+  /** series と同じ順番の月内金額。 */
+  amounts: number[];
+  /** 各色の上端。月どうしを点線でつなぐ位置になる。 */
+  boundaries: number[];
+};
+
+/**
+ * 月次推移をカテゴリ別の積み上げ棒にする（決定表「集計」列16）。
+ * 選択月のカテゴリ別内訳を先頭にし、色数を超える分は円グラフと同じ「その他」へまとめる。
+ */
+export function monthlyCategoryChart(
+  months: MonthlyCategoryInput[],
+  currentRows: CategoryTotal[],
+): { series: MonthlyCategorySeries[]; months: MonthlyCategoryBar[] } {
+  const totals = new Map<string, number>();
+  const names = new Map<string, string>();
+  for (const month of months) {
+    for (const row of month.rows) {
+      if (row.amount <= 0) continue;
+      totals.set(row.key, (totals.get(row.key) ?? 0) + row.amount);
+      names.set(row.key, row.name);
+    }
+  }
+
+  const currentKeys = currentRows.filter((row) => row.amount > 0).map((row) => row.key);
+  const currentSet = new Set(currentKeys);
+  const historicalKeys = [...totals.keys()]
+    .filter((key) => !currentSet.has(key))
+    .sort(
+      (a, b) =>
+        (totals.get(b) ?? 0) - (totals.get(a) ?? 0) ||
+        (names.get(a) ?? a).localeCompare(names.get(b) ?? b, 'ja'),
+    );
+  const orderedKeys = [...currentKeys, ...historicalKeys];
+  const visibleKeys = orderedKeys.slice(0, PIE_COLORS - 1);
+  const visibleSet = new Set(visibleKeys);
+  const hasOther = orderedKeys.some((key) => !visibleSet.has(key));
+
+  const series: MonthlyCategorySeries[] = visibleKeys.map((key, index) => ({
+    key,
+    name: names.get(key) ?? currentRows.find((row) => row.key === key)?.name ?? key,
+    colorIndex: index + 1,
+  }));
+  if (hasOther) series.push({ key: 'other', name: 'その他', colorIndex: PIE_COLORS });
+
+  return {
+    series,
+    months: months.map((month) => {
+      const byKey = new Map(month.rows.map((row) => [row.key, row.amount]));
+      const amounts = visibleKeys.map((key) => byKey.get(key) ?? 0);
+      if (hasOther) {
+        amounts.push(
+          month.rows
+            .filter((row) => !visibleSet.has(row.key))
+            .reduce((sum, row) => sum + row.amount, 0),
+        );
+      }
+      let cumulative = 0;
+      const boundaries = amounts.map((amount) => {
+        cumulative += amount;
+        return cumulative;
+      });
+      return { key: month.key, total: cumulative, amounts, boundaries };
+    }),
+  };
+}

@@ -32,6 +32,13 @@
         --c-own-panel: #fdf3e3;
         --c-bar: #4a6fa5;
         --c-bar-track: #dde7f5;
+        --c-cat-1: #2a78d6;
+        --c-cat-2: #eb6834;
+        --c-cat-3: #1baf7a;
+        --c-cat-4: #eda100;
+        --c-cat-5: #e87ba4;
+        --c-cat-6: #008300;
+        --c-cat-7: #4a3aa7;
         --c-supply: #704600;
         --c-supply-panel: #fff1b8;
       }
@@ -123,7 +130,7 @@
       .nav { display: flex; justify-content: space-around; border-top: 1px solid var(--c-line);
              background: var(--c-panel); padding: 6px 0; font-size: 11px; color: var(--c-muted); }
       .nav .on { color: var(--c-ink); font-weight: bold; }
-      .chart { display: flex; align-items: flex-end; gap: 6px; height: 90px; }
+      .chart { display: flex; align-items: flex-end; gap: 6px; height: 180px; }
       .chart > div { flex: 1; background: var(--c-bar); border-radius: 3px 3px 0 0; }
       .donut { width: 92px; height: 92px; border-radius: 50%;
                background: conic-gradient(var(--c-bar) 0 42%, #7fa6dd 42% 68%, #b9cbe4 68% 86%, var(--c-bar-track) 86% 100%); }
@@ -392,11 +399,21 @@
 
             <div class="card col grow">
               <h3>月次の推移</h3>
-              <div class="chart">
-                <div style="height: 40%"></div><div style="height: 55%"></div><div style="height: 48%"></div>
-                <div style="height: 72%"></div><div style="height: 60%"></div><div style="height: 88%"></div>
+              <div class="chart" style="position: relative">
+                <div style="height: 40%; background: linear-gradient(to top, var(--c-cat-1) 0 55%, var(--c-cat-2) 55% 100%)"></div>
+                <div style="height: 55%; background: linear-gradient(to top, var(--c-cat-1) 0 62%, var(--c-cat-2) 62% 100%)"></div>
+                <div style="height: 48%; background: linear-gradient(to top, var(--c-cat-1) 0 48%, var(--c-cat-2) 48% 100%)"></div>
+                <div style="height: 72%; background: linear-gradient(to top, var(--c-cat-1) 0 65%, var(--c-cat-2) 65% 100%)"></div>
+                <div style="height: 60%; background: linear-gradient(to top, var(--c-cat-1) 0 58%, var(--c-cat-2) 58% 100%)"></div>
+                <div style="height: 88%; background: linear-gradient(to top, var(--c-cat-1) 0 68%, var(--c-cat-2) 68% 100%)"></div>
+                <svg viewBox="0 0 300 90" preserveAspectRatio="none" style="position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none">
+                  <polyline points="25,70 75,59 125,68 175,45 225,58 275,30" fill="none" stroke="var(--c-muted)" stroke-width="1" stroke-dasharray="3 3"></polyline>
+                  <polyline points="25,54 75,41 125,47 175,25 225,36 275,11" fill="none" stroke="var(--c-muted)" stroke-width="1" stroke-dasharray="3 3"></polyline>
+                </svg>
               </div>
               <div class="muted">3月 … 8月／支出合計</div>
+              <div class="muted" style="cursor: ns-resize; text-align: center; line-height: 18px">•••</div>
+              <div class="note">カテゴリ別内訳と同じ順番・色で積み上げ、各カテゴリの上端を点線でつなぐ</div>
               <div class="row"><span>前月比</span><span class="amount warn">+12,300</span></div>
             </div>
           </div>

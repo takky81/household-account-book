@@ -6,6 +6,7 @@ import {
   aggregateMonth,
   categorySlices,
   monthDiff,
+  monthlyCategoryChart,
   targetUsers,
   type AggregateTx,
   type CategoryTotal,
@@ -317,6 +318,57 @@ describe('categorySlices', () => {
 
   it('取引が無い月は空で返す', () => {
     expect(categorySlices([])).toEqual([]);
+  });
+});
+
+describe('monthlyCategoryChart', () => {
+  const category = (id: string, amount: number): CategoryTotal => ({
+    key: id,
+    categoryId: id,
+    name: id,
+    children: [],
+    amount,
+  });
+
+  it('列16 選択月のカテゴリ別内訳と同じ順番・色で月ごとの金額を並べる', () => {
+    const current = [category('家賃', 200), category('食費', 100)];
+    const chart = monthlyCategoryChart(
+      [
+        {
+          key: '2026-07',
+          rows: [category('食費', 300), category('家賃', 100), category('交通費', 50)],
+        },
+        { key: '2026-08', rows: current },
+      ],
+      current,
+    );
+
+    expect(chart.series).toEqual([
+      { key: '家賃', name: '家賃', colorIndex: 1 },
+      { key: '食費', name: '食費', colorIndex: 2 },
+      { key: '交通費', name: '交通費', colorIndex: 3 },
+    ]);
+    expect(chart.months[0]).toEqual({
+      key: '2026-07',
+      total: 450,
+      amounts: [100, 300, 50],
+      boundaries: [100, 400, 450],
+    });
+  });
+
+  it('列16 色数を超えたカテゴリは月ごとに「その他」へまとめる', () => {
+    const rows = Array.from({ length: PIE_COLORS + 1 }, (_, index) =>
+      category(`c${index}`, 100),
+    );
+    const chart = monthlyCategoryChart([{ key: '2026-08', rows }], rows);
+
+    expect(chart.series).toHaveLength(PIE_COLORS);
+    expect(chart.series.at(-1)).toEqual({
+      key: 'other',
+      name: 'その他',
+      colorIndex: PIE_COLORS,
+    });
+    expect(chart.months[0]!.amounts.at(-1)).toBe(200);
   });
 });
 

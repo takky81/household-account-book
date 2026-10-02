@@ -6,6 +6,11 @@ function today(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' });
 }
 
+function dateInMonth(offset: number): string {
+  const [year, month] = today().split('-').map(Number);
+  return new Date(Date.UTC(year!, month! - 1 + offset, 15)).toISOString().slice(0, 10);
+}
+
 test.describe('集計', () => {
   test('列14 タグを選ぶとカテゴリをまたいで対象を絞れる', async ({ signedIn, users }) => {
     const travel = await seedTag('旅行');
@@ -167,5 +172,79 @@ test.describe('集計', () => {
     await signedIn.getByRole('button', { name: '食費の内訳' }).click();
     await expect(signedIn.getByText('外食')).toBeVisible();
     await expect(signedIn.getByText('（小分類なし）')).toBeVisible();
+  });
+
+  test('列16 月次推移はカテゴリ別内訳と同じ順番・色で積み上げ、境目を点線でつなぐ', async ({
+    signedIn,
+    users,
+  }) => {
+    const rent = await seedCategory({ name: '家賃' });
+    const food = await seedCategory({ name: '食費' });
+    for (const [categoryId, occurredOn, amount] of [
+      [rent, dateInMonth(-1), 500],
+      [food, dateInMonth(-1), 1500],
+      [rent, dateInMonth(0), 2000],
+      [food, dateInMonth(0), 1000],
+    ] as const) {
+      await seedTransaction({
+        categoryId,
+        payerId: users.taro,
+        createdBy: users.taro,
+        occurredOn,
+        amount,
+        splits: [{ userId: users.taro, amount }],
+      });
+    }
+
+    await signedIn.goto('/aggregate');
+
+    const breakdownRows = signedIn.getByTestId('category-breakdown').locator(':scope > li');
+    await expect(breakdownRows.nth(0)).toContainText('家賃');
+    await expect(breakdownRows.nth(1)).toContainText('食費');
+
+    const chart = signedIn.getByTestId('monthly-category-chart');
+    const currentMonth = today().slice(0, 7);
+    const rentSegment = chart.locator(
+      `[data-testid="monthly-category-segment"][data-month="${currentMonth}"][data-category-key="${rent}"]`,
+    );
+    const foodSegment = chart.locator(
+      `[data-testid="monthly-category-segment"][data-month="${currentMonth}"][data-category-key="${food}"]`,
+    );
+    await expect(rentSegment).toHaveAttribute('data-color-index', '1');
+    await expect(foodSegment).toHaveAttribute('data-color-index', '2');
+    await expect(chart.getByTestId('monthly-category-boundary').first()).toHaveAttribute(
+      'stroke-dasharray',
+      '4 4',
+    );
+  });
+
+  test('列17 月次推移は既定の高さを倍にし、下端のドラッグで変更できる', async ({
+    signedIn,
+  }) => {
+    await signedIn.goto('/aggregate');
+
+    const plot = signedIn.getByTestId('monthly-category-plot');
+    const handle = signedIn.getByRole('separator', { name: '月次推移の高さを変更' });
+    const initial = (await plot.boundingBox())!;
+    expect(initial.height).toBe(192);
+    await expect(handle).toHaveAttribute('aria-valuenow', '192');
+
+    await handle.scrollIntoViewIfNeeded();
+    const handleBox = (await handle.boundingBox())!;
+    await signedIn.mouse.move(
+      handleBox.x + handleBox.width / 2,
+      handleBox.y + handleBox.height / 2,
+    );
+    await signedIn.mouse.down();
+    await signedIn.mouse.move(
+      handleBox.x + handleBox.width / 2,
+      handleBox.y + handleBox.height / 2 + 80,
+    );
+    await signedIn.mouse.up();
+
+    await expect
+      .poll(async () => (await plot.boundingBox())?.height)
+      .toBeGreaterThanOrEqual(270);
+    await expect(handle).toHaveAttribute('aria-valuenow', '272');
   });
 });

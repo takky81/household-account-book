@@ -1,6 +1,6 @@
 /** 集計画面（決定表「集計」）。対象範囲 × 集計基準の2軸で見る。 */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card, Select, Tabs } from '../../components/ui';
 import { MonthNav } from '../app/Layout';
 import { addMonths } from '../../lib/date';
@@ -13,7 +13,10 @@ import {
   aggregateMonth,
   categorySlices,
   monthDiff,
+  monthlyCategoryChart,
   type Basis,
+  type MonthlyCategoryBar,
+  type MonthlyCategorySeries,
   type ScopeFilter,
   type Slice,
 } from './aggregate';
@@ -77,7 +80,7 @@ export function AggregatePage() {
       previous: aggregateMonth({ ...common, monthKey: addMonths(monthKey, -1) }),
       history: Array.from({ length: MONTHS_IN_CHART }, (_, i) => {
         const key = addMonths(monthKey, -(MONTHS_IN_CHART - 1 - i));
-        return { key, total: aggregateMonth({ ...common, monthKey: key }).expense };
+        return { key, totals: aggregateMonth({ ...common, monthKey: key }) };
       }),
     };
     // scope は毎回作り直されるオブジェクトなので、中身で見る
@@ -85,7 +88,10 @@ export function AggregatePage() {
 
   const slices = categorySlices(totals.byCategory);
   const colorOf = new Map(slices.map((slice) => [slice.key, slice.colorIndex]));
-  const peak = Math.max(1, ...history.map((h) => h.total));
+  const monthlyChart = monthlyCategoryChart(
+    history.map((month) => ({ key: month.key, rows: month.totals.byCategory })),
+    totals.byCategory,
+  );
 
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-3 p-3">
@@ -149,7 +155,7 @@ export function AggregatePage() {
         )}
         <div className="flex flex-wrap items-center gap-4">
           {slices.length > 1 && <CategoryPie slices={slices} />}
-          <ul className="flex min-w-[16rem] flex-1 flex-col gap-1">
+          <ul className="flex min-w-[16rem] flex-1 flex-col gap-1" data-testid="category-breakdown">
             {totals.byCategory.map((row) => {
               const slice = colorOf.get(row.key);
               const open = expanded.includes(row.key);
@@ -161,6 +167,8 @@ export function AggregatePage() {
                         aria-hidden
                         className="size-2.5 shrink-0 rounded-full"
                         style={{ background: `var(--c-cat-${slice ?? 7})` }}
+                        data-category-key={row.key}
+                        data-color-index={slice ?? 7}
                       />
                       {row.name}
                       {/* 小分類の取引があるときだけ内訳を開ける（§5.4） */}
@@ -225,21 +233,7 @@ export function AggregatePage() {
 
       <Card>
         <h2 className="mb-2 text-sm font-bold">月次の推移</h2>
-        <div className="flex h-24 gap-2">
-          {history.map((month) => (
-            <div key={month.key} className="flex h-full flex-1 flex-col items-center gap-1">
-              {/* 棒の高さは % で出すので、棒を入れる枠にも高さが要る */}
-              <div className="flex w-full flex-1 items-end">
-                <div
-                  className="w-full rounded-t bg-[var(--c-bar)]"
-                  style={{ height: `${(month.total / peak) * 100}%` }}
-                  title={`${month.key} ${formatAmount(month.total)}`}
-                />
-              </div>
-              <span className="text-[10px] text-[var(--c-muted)]">{month.key.slice(5)}</span>
-            </div>
-          ))}
-        </div>
+        <MonthlyCategoryTrend series={monthlyChart.series} months={monthlyChart.months} />
       </Card>
 
       {scope.kind === 'group' && (
@@ -258,6 +252,164 @@ export function AggregatePage() {
         </Card>
       )}
     </main>
+  );
+}
+
+/** カテゴリ別の積み上げ棒。各色の上端を点線で結び、月ごとの増減を追えるようにする。 */
+function MonthlyCategoryTrend({
+  series,
+  months,
+}: {
+  series: MonthlyCategorySeries[];
+  months: MonthlyCategoryBar[];
+}) {
+  const DEFAULT_HEIGHT = 192;
+  const MIN_HEIGHT = 96;
+  const MAX_HEIGHT = 480;
+  const width = 600;
+  const plotBottom = 100;
+  const plotHeight = plotBottom;
+  const step = width / Math.max(months.length, 1);
+  const barWidth = Math.min(56, step * 0.58);
+  const peak = Math.max(1, ...months.map((month) => month.total));
+  const centerOf = (index: number) => step * index + step / 2;
+  const yOf = (amount: number) => plotBottom - (amount / peak) * plotHeight;
+  const [height, setHeight] = useState(DEFAULT_HEIGHT);
+  const drag = useRef<{ source: 'mouse' | 'touch'; y: number; height: number } | null>(null);
+  const clampHeight = (next: number) => Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, next));
+
+  useEffect(() => {
+    const moveMouse = (event: MouseEvent) => {
+      const start = drag.current;
+      if (start === null || start.source !== 'mouse') return;
+      setHeight(Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, start.height + event.clientY - start.y)));
+    };
+    const moveTouch = (event: TouchEvent) => {
+      const start = drag.current;
+      const touch = event.touches[0];
+      if (start === null || start.source !== 'touch' || touch === undefined) return;
+      event.preventDefault();
+      setHeight(Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, start.height + touch.clientY - start.y)));
+    };
+    const stopMouse = () => {
+      if (drag.current?.source === 'mouse') drag.current = null;
+    };
+    const stopTouch = () => {
+      if (drag.current?.source === 'touch') drag.current = null;
+    };
+    window.addEventListener('mousemove', moveMouse);
+    window.addEventListener('mouseup', stopMouse);
+    window.addEventListener('touchmove', moveTouch, { passive: false });
+    window.addEventListener('touchend', stopTouch);
+    window.addEventListener('touchcancel', stopTouch);
+    return () => {
+      window.removeEventListener('mousemove', moveMouse);
+      window.removeEventListener('mouseup', stopMouse);
+      window.removeEventListener('touchmove', moveTouch);
+      window.removeEventListener('touchend', stopTouch);
+      window.removeEventListener('touchcancel', stopTouch);
+    };
+  }, []);
+
+  return (
+    <div data-testid="monthly-category-chart">
+      <div style={{ height }} data-testid="monthly-category-plot">
+        <svg
+          viewBox={`0 0 ${width} ${plotBottom}`}
+          preserveAspectRatio="none"
+          role="img"
+          aria-label="カテゴリ別の月次推移"
+          className="size-full"
+        >
+          {months.flatMap((month, monthIndex) => {
+            let bottom = 0;
+            return month.amounts.map((amount, seriesIndex) => {
+              const next = bottom + amount;
+              const y = yOf(next);
+              const segmentHeight = yOf(bottom) - y;
+              bottom = next;
+              const item = series[seriesIndex]!;
+              return (
+                <rect
+                  key={`${month.key}-${item.key}`}
+                  x={centerOf(monthIndex) - barWidth / 2}
+                  y={y}
+                  width={barWidth}
+                  height={segmentHeight}
+                  fill={`var(--c-cat-${item.colorIndex})`}
+                  data-testid="monthly-category-segment"
+                  data-month={month.key}
+                  data-category-key={item.key}
+                  data-color-index={item.colorIndex}
+                  aria-label={`${month.key} ${item.name} ${formatAmount(amount)}`}
+                />
+              );
+            });
+          })}
+
+          {/* 積み上げた各カテゴリの上端を、隣の月まで点線でつなぐ。 */}
+          {series.flatMap((item, seriesIndex) =>
+            months.slice(0, -1).map((month, monthIndex) => {
+              const nextMonth = months[monthIndex + 1]!;
+              const from = month.boundaries[seriesIndex] ?? 0;
+              const to = nextMonth.boundaries[seriesIndex] ?? 0;
+              if (from === 0 && to === 0) return null;
+              return (
+                <line
+                  key={`${item.key}-${month.key}`}
+                  x1={centerOf(monthIndex) + barWidth / 2}
+                  y1={yOf(from)}
+                  x2={centerOf(monthIndex + 1) - barWidth / 2}
+                  y2={yOf(to)}
+                  stroke="var(--c-muted)"
+                  strokeWidth="1.5"
+                  strokeDasharray="4 4"
+                  vectorEffect="non-scaling-stroke"
+                  data-testid="monthly-category-boundary"
+                />
+              );
+            }),
+          )}
+        </svg>
+      </div>
+
+      <div className="flex" aria-hidden="true">
+        {months.map((month) => (
+          <span
+            key={month.key}
+            className="flex-1 text-center text-[10px] text-[var(--c-muted)]"
+          >
+            {month.key.slice(5)}
+          </span>
+        ))}
+      </div>
+
+      <button
+        type="button"
+        role="separator"
+        aria-label="月次推移の高さを変更"
+        aria-orientation="horizontal"
+        aria-valuemin={MIN_HEIGHT}
+        aria-valuemax={MAX_HEIGHT}
+        aria-valuenow={height}
+        className="mt-1 flex min-h-6 w-full cursor-ns-resize touch-none items-center justify-center rounded text-[var(--c-muted)] hover:bg-[var(--c-subtle)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--c-ink)]"
+        onMouseDown={(event) => {
+          event.preventDefault();
+          drag.current = { source: 'mouse', y: event.clientY, height };
+        }}
+        onTouchStart={(event) => {
+          const touch = event.touches[0];
+          if (touch !== undefined) drag.current = { source: 'touch', y: touch.clientY, height };
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+          event.preventDefault();
+          setHeight((current) => clampHeight(current + (event.key === 'ArrowUp' ? -16 : 16)));
+        }}
+      >
+        <span aria-hidden="true">•••</span>
+      </button>
+    </div>
   );
 }
 
