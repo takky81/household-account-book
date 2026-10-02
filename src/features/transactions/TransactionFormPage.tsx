@@ -29,17 +29,6 @@ import { useNarrow } from '../../lib/useNarrow';
 
 const SHARED = '__shared__';
 
-/** 金額欄に入れられる演算子。見た目は読みやすい記号、入れるのは計算に使う文字 */
-const OPERATORS = [
-  { label: '＋', insert: '+' },
-  { label: '−', insert: '-' },
-  { label: '×', insert: '*' },
-  { label: '÷', insert: '/' },
-  { label: '(', insert: '(' },
-  { label: ')', insert: ')' },
-  { label: '.', insert: '.' },
-];
-
 type KeypadKey =
   | { label: string; insert: string; kind: 'digit' | 'operator' | 'utility'; wide?: boolean }
   | { label: string; action: 'clear' | 'backspace'; kind: 'utility' };
@@ -93,8 +82,12 @@ export function TransactionFormPage() {
   const [saved, setSaved] = useState('');
   const [busy, setBusy] = useState(false);
   const [keypadOpen, setKeypadOpen] = useState(false);
+  const [keypadHeight, setKeypadHeight] = useState(0);
+  const [amountCursor, setAmountCursor] = useState(0);
   /** 続けて入力するとき、次の入力へすぐ移れるように金額へ戻す（列13） */
   const amountRef = useRef<HTMLInputElement>(null);
+  const amountAreaRef = useRef<HTMLDivElement>(null);
+  const keypadRef = useRef<HTMLElement>(null);
 
   const category = workspace.categories.find((c) => c.id === categoryId) ?? null;
   const scope = workspace.scopes.find((s) => s.key === scopeKeyValue) ?? workspace.scopes[0] ?? null;
@@ -186,7 +179,7 @@ export function TransactionFormPage() {
     [workspace.tree, kind],
   );
 
-  // 式か小数のときだけ計算結果を欄の下に出す。ただの数字なら何も出さない（列16）
+  // 式か小数のときだけ計算結果を金額ラベルの右に出す。ただの整数なら何も出さない（列16）
   // 計算できない間は入力の途中でもあるので、保存を押すまでは何も出さない（列17）
   const isComputed = amountText.trim() !== '' && isAmountComputed(amountText);
   const exact = isComputed ? evaluateExpression(amountText) : null;
@@ -194,8 +187,51 @@ export function TransactionFormPage() {
   const amountHint = amountBroken ? (
     amountWarned ? <span className="text-[var(--c-warn)]">計算できません</span> : undefined
   ) : (
-    `= ${formatAmount(amount)}${Number.isInteger(exact) ? '' : '（四捨五入）'}`
+    `（=${formatAmount(amount)}${Number.isInteger(exact) ? '' : '・四捨五入'}）`
   );
+  const amountLabelSummary =
+    amountHint === undefined ? undefined : (
+      <span data-testid="amount-label-summary" aria-live="polite" className="tabular-nums">
+        {amountHint}
+      </span>
+    );
+
+  // 固定表示の電卓に本文が隠れないよう、実寸ぶんのスクロール余白を確保する。
+  useEffect(() => {
+    if (!narrow || !keypadOpen) {
+      setKeypadHeight(0);
+      return;
+    }
+    const keypad = keypadRef.current;
+    if (keypad === null) return;
+    const measure = () => {
+      const next = Math.ceil(keypad.getBoundingClientRect().height);
+      setKeypadHeight((current) => (current === next ? current : next));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(keypad);
+    return () => observer.disconnect();
+  }, [keypadOpen, narrow]);
+
+  // 電卓の高さが確定してから、金額欄を電卓の上へ必要な分だけ移動する。
+  useEffect(() => {
+    if (!narrow || !keypadOpen || keypadHeight === 0) return;
+    const frame = requestAnimationFrame(() => {
+      const amountArea = amountAreaRef.current;
+      const keypad = keypadRef.current;
+      if (amountArea === null || keypad === null) return;
+      const amountRect = amountArea.getBoundingClientRect();
+      const keypadRect = keypad.getBoundingClientRect();
+      const gap = 12;
+      if (amountRect.bottom > keypadRect.top - gap) {
+        window.scrollBy({ top: amountRect.bottom - keypadRect.top + gap, behavior: 'smooth' });
+      } else if (amountRect.top < gap) {
+        window.scrollBy({ top: amountRect.top - gap, behavior: 'smooth' });
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [keypadHeight, keypadOpen, narrow]);
 
   /** 金額欄を書き換える。計算できる形に直った時点で警告を消す（列17） */
   function changeAmount(next: string) {
@@ -204,26 +240,29 @@ export function TransactionFormPage() {
     if (parseAmountInput(next) !== null) setAmountWarned(false);
   }
 
-  /** 演算子をカーソル位置に入れる。入力欄の外のボタンから呼ぶ（列16） */
+  /** 電卓では独自カーソル、PCでは標準の選択範囲へ文字を入れる（列16）。 */
   function insertIntoAmount(text: string) {
     const input = amountRef.current;
-    const start = input?.selectionStart ?? amountText.length;
-    const end = input?.selectionEnd ?? start;
+    const start = narrow ? amountCursor : (input?.selectionStart ?? amountText.length);
+    const end = narrow ? amountCursor : (input?.selectionEnd ?? start);
+    const nextCursor = start + text.length;
     changeAmount(amountText.slice(0, start) + text + amountText.slice(end));
+    if (narrow) setAmountCursor(nextCursor);
     if (input === null) return;
     input.focus();
     // 値の反映後にカーソルを入れた文字の後ろへ動かす
-    requestAnimationFrame(() => input.setSelectionRange(start + text.length, start + text.length));
+    requestAnimationFrame(() => input.setSelectionRange(nextCursor, nextCursor));
   }
 
   /** 選択範囲、またはカーソル直前の1文字を消す。 */
   function deleteFromAmount() {
     const input = amountRef.current;
-    const start = input?.selectionStart ?? amountText.length;
-    const end = input?.selectionEnd ?? start;
+    const start = narrow ? amountCursor : (input?.selectionStart ?? amountText.length);
+    const end = narrow ? amountCursor : (input?.selectionEnd ?? start);
     const deleteFrom = start === end ? Math.max(0, start - 1) : start;
     if (deleteFrom === end) return;
     changeAmount(amountText.slice(0, deleteFrom) + amountText.slice(end));
+    if (narrow) setAmountCursor(deleteFrom);
     if (input === null) return;
     input.focus();
     requestAnimationFrame(() => input.setSelectionRange(deleteFrom, deleteFrom));
@@ -231,7 +270,24 @@ export function TransactionFormPage() {
 
   function clearAmount() {
     changeAmount('');
+    setAmountCursor(0);
     amountRef.current?.focus();
+  }
+
+  /** 金額欄を開いたときは末尾から入力を始める。 */
+  function moveAmountCursorToEnd() {
+    const input = amountRef.current;
+    if (input === null) return;
+    setAmountCursor(amountText.length);
+    requestAnimationFrame(() => input.setSelectionRange(amountText.length, amountText.length));
+  }
+
+  /** 電卓上部の矢印で独自カーソルを1文字ずつ動かす。 */
+  function moveAmountCursor(offset: -1 | 1) {
+    const next = Math.max(0, Math.min(amountText.length, amountCursor + offset));
+    setAmountCursor(next);
+    const input = amountRef.current;
+    if (input !== null) requestAnimationFrame(() => input.setSelectionRange(next, next));
   }
 
   async function save(again: boolean) {
@@ -300,8 +356,16 @@ export function TransactionFormPage() {
   return (
     <main
       className="mx-auto flex max-w-md flex-col gap-3 p-3"
+      style={
+        narrow && keypadOpen && keypadHeight > 0
+          ? { paddingBottom: `calc(${keypadHeight}px + 1rem)` }
+          : undefined
+      }
       onFocusCapture={(event) => {
-        if (event.target !== amountRef.current && !(event.target as HTMLElement).closest('#amount-keypad')) {
+        if (
+          event.target !== amountRef.current &&
+          !(event.target as HTMLElement).closest('#amount-keypad')
+        ) {
           setKeypadOpen(false);
         }
       }}
@@ -360,53 +424,100 @@ export function TransactionFormPage() {
         />
       </FieldGroup>
 
-      <Field label="金額" hint={amountHint} required>
-        <TextInput
-          ref={amountRef}
-          // スマホは独自の電卓キーボード、広い画面は物理キーボードで入力する（列16）
-          inputMode={narrow ? 'none' : 'decimal'}
-          readOnly={narrow}
-          aria-label="金額"
-          aria-controls={narrow ? 'amount-keypad' : undefined}
-          aria-expanded={narrow ? keypadOpen : undefined}
-          className="text-xl tabular-nums"
-          value={amountText}
-          onChange={(e) => changeAmount(e.target.value)}
-          onFocus={() => {
-            if (narrow) setKeypadOpen(true);
-          }}
-          onClick={() => {
-            if (narrow) setKeypadOpen(true);
-          }}
-        />
-      </Field>
-
-      {/* 広い画面では物理キーボードを使いながら、演算子だけボタンでも入れられる。 */}
-      <div className="hidden gap-1 md:flex">
-        {OPERATORS.map((op) => (
-          <Button
-            key={op.insert}
-            variant="ghost"
-            aria-label={op.label}
-            className="w-9 px-0 text-center"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => insertIntoAmount(op.insert)}
-          >
-            {op.label}
-          </Button>
-        ))}
+      <div ref={amountAreaRef} data-testid="amount-field">
+        <Field label="金額" labelEnd={amountLabelSummary} required>
+          <div className="relative" data-testid="amount-input-shell">
+            <TextInput
+              ref={amountRef}
+              // スマホは独自の電卓キーボード、広い画面は物理キーボードで入力する（列16）
+              inputMode={narrow ? 'none' : 'decimal'}
+              readOnly={narrow}
+              aria-label="金額"
+              aria-controls={narrow ? 'amount-keypad' : undefined}
+              aria-expanded={narrow ? keypadOpen : undefined}
+              className={[
+                'w-full text-xl tabular-nums',
+                narrow ? 'text-transparent caret-transparent' : '',
+                narrow && keypadOpen
+                  ? 'border-[var(--c-ink)] ring-2 ring-[var(--c-ink)] ring-offset-1 ring-offset-[var(--c-panel)]'
+                  : '',
+              ].join(' ')}
+              value={amountText}
+              onChange={(e) => changeAmount(e.target.value)}
+              onFocus={() => {
+                if (narrow) {
+                  setKeypadOpen(true);
+                  moveAmountCursorToEnd();
+                }
+              }}
+              onClick={() => {
+                if (narrow) {
+                  setKeypadOpen(true);
+                  moveAmountCursorToEnd();
+                }
+              }}
+            />
+            {narrow && (
+              <div
+                className="pointer-events-none absolute inset-0 flex items-center overflow-hidden px-2 py-1.5 text-xl text-[var(--c-ink)] tabular-nums"
+                aria-hidden="true"
+                data-testid="amount-input-display"
+              >
+                <span className="whitespace-pre">{amountText.slice(0, amountCursor)}</span>
+                {keypadOpen && (
+                  <span
+                    className="ml-0.5 h-6 w-0.5 shrink-0 bg-[var(--c-ink)]"
+                    data-testid="amount-custom-caret"
+                  />
+                )}
+                <span className="whitespace-pre">{amountText.slice(amountCursor)}</span>
+              </div>
+            )}
+          </div>
+        </Field>
       </div>
 
       {narrow && keypadOpen && (
         <section
+          ref={keypadRef}
           id="amount-keypad"
           aria-label="金額の電卓キーボード"
-          className="fixed inset-x-0 z-30 border-t border-[var(--c-line)] bg-[var(--c-panel)] p-2 shadow-[0_-8px_24px_rgb(0_0_0/0.18)] md:hidden"
-          style={{ bottom: 'calc(3.25rem + max(env(safe-area-inset-bottom), 0.75rem))' }}
+          className="fixed inset-x-0 z-30 overflow-y-auto border-t border-[var(--c-line)] bg-[var(--c-panel)] p-2 shadow-[0_-8px_24px_rgb(0_0_0/0.18)] md:hidden"
+          style={{
+            bottom: 'calc(3.25rem + max(env(safe-area-inset-bottom), 0.75rem))',
+            maxHeight:
+              'calc(100dvh - 3.25rem - max(env(safe-area-inset-bottom), 0.75rem))',
+          }}
         >
-          <div className="mx-auto flex max-w-md items-center justify-between px-1 pb-2">
+          <div className="sticky top-0 z-10 mx-auto grid max-w-md grid-cols-[1fr_auto_1fr] items-center gap-2 bg-[var(--c-panel)] px-1 pb-2">
             <strong className="text-sm">金額を計算</strong>
-            <Button variant="ghost" className="min-h-11" onClick={() => setKeypadOpen(false)}>
+            <div className="flex gap-1" role="group" aria-label="カーソル位置">
+              <Button
+                variant="ghost"
+                aria-label="カーソルを左へ"
+                className="min-h-11 w-11 px-0 text-lg"
+                disabled={amountCursor === 0}
+                onPointerDown={(event) => event.preventDefault()}
+                onClick={() => moveAmountCursor(-1)}
+              >
+                ←
+              </Button>
+              <Button
+                variant="ghost"
+                aria-label="カーソルを右へ"
+                className="min-h-11 w-11 px-0 text-lg"
+                disabled={amountCursor === amountText.length}
+                onPointerDown={(event) => event.preventDefault()}
+                onClick={() => moveAmountCursor(1)}
+              >
+                →
+              </Button>
+            </div>
+            <Button
+              variant="ghost"
+              className="min-h-11 justify-self-end"
+              onClick={() => setKeypadOpen(false)}
+            >
               完了
             </Button>
           </div>

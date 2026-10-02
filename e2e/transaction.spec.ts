@@ -282,7 +282,7 @@ test.describe('取引の入力と編集', () => {
     await expect(signedIn.getByRole('button', { name: '保存', exact: true })).toBeVisible();
   });
 
-  test('列16 金額に式を入れると結果が欄の下に出て、その値で保存される', async ({
+  test('列16 金額に式を入れると結果を金額ラベルの右に出して、その値で保存される', async ({
     signedIn,
   }) => {
     await seedCategory({ name: '外食' });
@@ -290,27 +290,28 @@ test.describe('取引の入力と編集', () => {
     await signedIn.goto('/new');
     await chooseCategory(signedIn, '外食');
     await signedIn.getByLabel('金額').fill('1200+800');
-    await expect(signedIn.getByText('= 2,000')).toBeVisible();
+    await expect(signedIn.getByText('（=2,000）')).toBeVisible();
 
     await signedIn.getByRole('button', { name: '保存', exact: true }).click();
     await expect(signedIn.getByRole('heading', { name: '取引一覧' })).toBeVisible();
     expect((await latestTransaction()).amount).toBe(2000);
   });
 
-  test('列16 演算子ボタンで式を組み立てられる', async ({ signedIn }) => {
+  test('列16 PCでは演算子ボタンを表示せず物理キーボードで式を入力できる', async ({
+    signedIn,
+  }) => {
     await seedCategory({ name: '交通費' });
 
     await signedIn.goto('/new');
     await chooseCategory(signedIn, '交通費');
-    await signedIn.getByLabel('金額').fill('420');
-    await signedIn.getByRole('button', { name: '×' }).click();
-    await signedIn.getByLabel('金額').pressSequentially('3');
+    await expect(signedIn.getByRole('button', { name: '×', exact: true })).toHaveCount(0);
+    await signedIn.getByLabel('金額').fill('420*3');
     await expect(signedIn.getByLabel('金額')).toHaveValue('420*3');
-    await expect(signedIn.getByText('= 1,260')).toBeVisible();
+    await expect(signedIn.getByText('（=1,260）')).toBeVisible();
   });
 
-  test('列16 スマホでは数字と演算子を電卓キーボードから入力できる', async ({ signedIn }) => {
-    await signedIn.setViewportSize({ width: 390, height: 844 });
+  test('列16 スマホでは計算結果を隠さず電卓キーボードから入力できる', async ({ signedIn }) => {
+    await signedIn.setViewportSize({ width: 390, height: 568 });
     await seedCategory({ name: 'スマホ入力' });
 
     await signedIn.goto('/new');
@@ -322,12 +323,44 @@ test.describe('取引の入力と編集', () => {
     await expect(keypad).toBeVisible();
     await expect(amount).toHaveAttribute('readonly', '');
     await expect(amount).toHaveAttribute('inputmode', 'none');
+    await expect(signedIn.getByTestId('amount-custom-caret')).toBeVisible();
+    expect(await amount.evaluate((element) => getComputedStyle(element).boxShadow)).not.toBe(
+      'none',
+    );
+    await expect
+      .poll(async () => {
+        const amountBox = await signedIn.getByTestId('amount-field').boundingBox();
+        const keypadBox = await keypad.boundingBox();
+        return amountBox !== null && keypadBox !== null && amountBox.y + amountBox.height < keypadBox.y;
+      })
+      .toBe(true);
 
     for (const key of ['1', '2', '0', '0', '＋', '8', '0', '0']) {
       await keypad.getByRole('button', { name: key, exact: true }).click();
     }
     await expect(amount).toHaveValue('1200+800');
-    await expect(signedIn.getByText('= 2,000')).toBeVisible();
+    await expect(signedIn.getByTestId('amount-input-display')).toContainText('1200+800');
+    const summary = signedIn.getByTestId('amount-label-summary');
+    await expect(summary).toHaveText('（=2,000）');
+    await expect(keypad.getByTestId('amount-label-summary')).toHaveCount(0);
+    const labelBox = (await signedIn.getByText('金額', { exact: true }).boundingBox())!;
+    const summaryBox = (await summary.boundingBox())!;
+    const amountBox = (await amount.boundingBox())!;
+    expect(summaryBox.x).toBeGreaterThanOrEqual(labelBox.x + labelBox.width);
+    expect(summaryBox.x - labelBox.x - labelBox.width).toBeLessThanOrEqual(16);
+    expect(summaryBox.y + summaryBox.height).toBeLessThanOrEqual(amountBox.y);
+
+    const moveLeft = keypad.getByRole('button', { name: 'カーソルを左へ' });
+    const moveRight = keypad.getByRole('button', { name: 'カーソルを右へ' });
+    await expect(moveRight).toBeDisabled();
+    await moveLeft.click();
+    await expect(moveRight).toBeEnabled();
+    await keypad.getByRole('button', { name: '9', exact: true }).click();
+    await expect(amount).toHaveValue('1200+8090');
+    await keypad.getByRole('button', { name: '1文字削除' }).click();
+    await expect(amount).toHaveValue('1200+800');
+    await moveRight.click();
+    await expect(moveRight).toBeDisabled();
 
     await keypad.getByRole('button', { name: '1文字削除' }).click();
     await expect(amount).toHaveValue('1200+80');
@@ -336,6 +369,7 @@ test.describe('取引の入力と編集', () => {
 
     await keypad.getByRole('button', { name: '完了' }).click();
     await expect(keypad).toBeHidden();
+    await expect(signedIn.getByTestId('amount-custom-caret')).toBeHidden();
   });
 
   test('列16 小数をそのまま打つと四捨五入して保存される', async ({ signedIn }) => {
@@ -345,7 +379,7 @@ test.describe('取引の入力と編集', () => {
     await chooseCategory(signedIn, '日用品');
     // 広い画面では物理キーボードから小数点を入力できる
     await signedIn.getByLabel('金額').fill('1980.5');
-    await expect(signedIn.getByText('= 1,981（四捨五入）')).toBeVisible();
+    await expect(signedIn.getByText('（=1,981・四捨五入）')).toBeVisible();
 
     await signedIn.getByRole('button', { name: '保存', exact: true }).click();
     await expect(signedIn.getByRole('heading', { name: '取引一覧' })).toBeVisible();
@@ -369,7 +403,7 @@ test.describe('取引の入力と編集', () => {
     // 直したらその場で消える
     await signedIn.getByLabel('金額').fill('1200+300');
     await expect(signedIn.getByText('計算できません', { exact: true })).toBeHidden();
-    await expect(signedIn.getByText('= 1,500')).toBeVisible();
+    await expect(signedIn.getByText('（=1,500）')).toBeVisible();
   });
   test('列18 小分類を持つ大分類はそのまま選んで保存できる', async ({ signedIn }) => {
     const parent = await seedCategory({ name: '食費' });

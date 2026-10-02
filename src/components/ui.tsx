@@ -109,11 +109,14 @@ export function ConfirmDialog({
 
 export function Field({
   label,
+  labelEnd,
   children,
   hint,
   required = false,
 }: {
   label: string;
+  /** ラベル行の右側へ置く補助表示。 */
+  labelEnd?: ReactNode;
   children: ReactNode;
   hint?: ReactNode;
   /** 必須項目のラベルを、任意項目より強く表示する。 */
@@ -121,14 +124,21 @@ export function Field({
 }) {
   return (
     <label className="flex flex-col gap-1">
-      <span
-        className={cn(
-          required
-            ? 'text-sm font-bold text-[var(--c-ink)]'
-            : 'text-xs text-[var(--c-muted)]',
+      <span className="flex min-w-0 items-baseline gap-2">
+        <span
+          className={cn(
+            required
+              ? 'shrink-0 text-sm font-bold text-[var(--c-ink)]'
+              : 'shrink-0 text-xs text-[var(--c-muted)]',
+          )}
+        >
+          {label}
+        </span>
+        {labelEnd !== undefined && (
+          <span className="min-w-0 text-left text-xs font-normal text-[var(--c-muted)]">
+            {labelEnd}
+          </span>
         )}
-      >
-        {label}
       </span>
       {children}
       {hint !== undefined && <span className="text-xs text-[var(--c-muted)]">{hint}</span>}

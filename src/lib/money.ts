@@ -44,7 +44,7 @@ function normalizeExpression(input: string): string {
 
 /**
  * 打った文字がそのまま金額にならないか。演算子・括弧・小数点のどれかを含むかで見る。
- * true のときだけ計算結果を欄の下に出す（決定表「取引の入力と編集」列16）。
+ * true のときだけ計算結果を金額ラベルの右に出す（決定表「取引の入力と編集」列16）。
  */
 export function isAmountComputed(input: string): boolean {
   return /[+\-*/().]/.test(normalizeExpression(input));
