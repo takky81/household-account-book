@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures';
+import { test, expect, chooseCategory } from './fixtures';
 import { adminClient, seedCategory, seedTransaction } from './db';
 
 test.describe('表示設定と共通の振る舞い', () => {
@@ -26,7 +26,7 @@ test.describe('表示設定と共通の振る舞い', () => {
     await seedCategory({ name: '食費' });
 
     await signedIn.goto('/new');
-    await signedIn.getByLabel('大カテゴリ').selectOption({ label: '食費' });
+    await chooseCategory(signedIn, '食費');
     await signedIn.getByLabel('金額').fill('780');
 
     const save = signedIn.getByRole('button', { name: '保存', exact: true });
@@ -53,7 +53,7 @@ test.describe('表示設定と共通の振る舞い', () => {
     await seedCategory({ name: '食費' });
 
     await signedIn.goto('/new');
-    await signedIn.getByLabel('大カテゴリ').selectOption({ label: '食費' });
+    await chooseCategory(signedIn, '食費');
     await signedIn.getByLabel('金額').fill('780');
     await signedIn.getByLabel('備考').fill('昼食');
 

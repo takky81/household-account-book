@@ -24,6 +24,7 @@ import { validateTransaction } from './validation';
 import { scopeKey, type Kind } from '../categories/name';
 import { selectableCategories } from '../categories/tree';
 import { TagPicker } from '../tags/TagPicker';
+import { CategoryPicker } from './CategoryPicker';
 
 const SHARED = '__shared__';
 
@@ -154,21 +155,6 @@ export function TransactionFormPage() {
     () => selectableCategories(workspace.tree.filter((c) => c.kind === kind)),
     [workspace.tree, kind],
   );
-  const rootCategories = useMemo(
-    () => categoriesOfKind.filter((c) => c.parentId === null),
-    [categoriesOfKind],
-  );
-  const selectedTreeCategory = workspace.tree.find((c) => c.id === categoryId) ?? null;
-  const rootCategoryId =
-    selectedTreeCategory === null
-      ? ''
-      : (selectedTreeCategory.parentId ?? selectedTreeCategory.id);
-  const childCategories = useMemo(
-    () => categoriesOfKind.filter((c) => c.parentId === rootCategoryId),
-    [categoriesOfKind, rootCategoryId],
-  );
-  const childCategoryId =
-    selectedTreeCategory !== null && selectedTreeCategory.parentId !== null ? categoryId : '';
 
   // 式か小数のときだけ計算結果を欄の下に出す。ただの数字なら何も出さない（列16）
   // 計算できない間は入力の途中でもあるので、保存を押すまでは何も出さない（列17）
@@ -308,51 +294,16 @@ export function TransactionFormPage() {
         />
       </FieldGroup>
 
-      <div className="grid grid-cols-2 gap-2">
-        <Field label="大カテゴリ" required>
-          <select
-            aria-label="大カテゴリ"
-            className="min-w-0 rounded-md border border-[var(--c-edge)] bg-[var(--c-panel)] px-2 py-1.5 text-sm"
-            value={rootCategoryId}
-            onChange={(e) => {
-              // 大カテゴリを変えた直後は、その大カテゴリ自体へ記録する。
-              // 小カテゴリは右の候補から必要なときだけ選ぶ（§3.4.1）。
-              setCategoryId(e.target.value);
-              setManualSplits(null);
-            }}
-          >
-            <option value="">選んでください</option>
-            {rootCategories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-
-        <Field label="小カテゴリ（任意）">
-          <select
-            aria-label="小カテゴリ"
-            className="min-w-0 rounded-md border border-[var(--c-edge)] bg-[var(--c-panel)] px-2 py-1.5 text-sm disabled:opacity-60"
-            value={childCategoryId}
-            disabled={rootCategoryId === '' || childCategories.length === 0}
-            onChange={(e) => {
-              // 空欄へ戻したときは大カテゴリそのものを選んだ状態にする。
-              setCategoryId(e.target.value === '' ? rootCategoryId : e.target.value);
-              setManualSplits(null);
-            }}
-          >
-            <option value="">
-              {childCategories.length === 0 ? '小カテゴリなし' : '選択なし'}
-            </option>
-            {childCategories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </div>
+      <FieldGroup label="カテゴリ" required>
+        <CategoryPicker
+          categories={categoriesOfKind}
+          value={categoryId}
+          onChange={(next) => {
+            setCategoryId(next);
+            setManualSplits(null);
+          }}
+        />
+      </FieldGroup>
 
       <Field label="金額" hint={amountHint} required>
         <TextInput

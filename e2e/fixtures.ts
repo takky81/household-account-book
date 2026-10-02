@@ -23,6 +23,22 @@ export async function confirmDialog(page: Page, label = '削除する'): Promise
   await expect(page.getByRole('dialog')).toHaveCount(0);
 }
 
+/** 取引入力の1つのメニューから、大カテゴリと任意の小カテゴリを選ぶ。 */
+export async function chooseCategory(
+  page: Page,
+  rootName: string,
+  childName?: string,
+): Promise<void> {
+  await page.getByRole('button', { name: 'カテゴリ', exact: true }).click();
+  const menu = page.getByRole('menu', { name: 'カテゴリの選択肢' });
+  await menu.getByRole('menuitem', { name: rootName, exact: true }).click();
+  if (childName !== undefined) {
+    await menu.getByRole('menuitem', { name: childName, exact: true }).click();
+  } else if (await menu.isVisible()) {
+    await menu.getByRole('menuitem', { name: `${rootName}（大カテゴリ）`, exact: true }).click();
+  }
+}
+
 /** 各テストを空のデータから始める。 */
 export const test = base.extend<{ users: TestUsers; signedIn: Page }>({
   users: async ({}, use) => {

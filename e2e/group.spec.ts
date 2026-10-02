@@ -1,4 +1,4 @@
-import { test, expect, confirmDialog } from './fixtures';
+import { test, expect, chooseCategory, confirmDialog } from './fixtures';
 import { adminClient, seedCategory, seedGroup, seedTransaction } from './db';
 
 async function groupNames(): Promise<string[]> {
@@ -208,7 +208,7 @@ test.describe('共有グループの管理', () => {
     await signedIn.getByRole('group', { name: '共有範囲' })
       .getByRole('button', { name: '夫婦' })
       .click();
-    await signedIn.getByLabel('大カテゴリ').selectOption({ label: '家賃' });
+    await chooseCategory(signedIn, '家賃');
     await signedIn.getByLabel('金額').fill('1000');
     await expect(signedIn.getByLabel('taroの負担')).toHaveValue('750');
   });
