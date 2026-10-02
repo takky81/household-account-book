@@ -1,5 +1,5 @@
 import { test, expect, chooseCategory } from './fixtures';
-import { adminClient, seedCategory, seedTransaction } from './db';
+import { adminClient, seedCategory, seedTag, seedTransaction } from './db';
 
 test.describe('表示設定と共通の振る舞い', () => {
   test('列1 ダークモードに切り替えると次に開いても続く', async ({ signedIn }) => {
@@ -113,6 +113,35 @@ test.describe('表示設定と共通の振る舞い', () => {
     await expect(signedIn.getByTestId('tx-table')).toBeVisible();
     await expect(signedIn.getByTestId('tx-cards')).toHaveCount(0);
     await expect(signedIn.locator('main')).toHaveCSS('max-width', '1152px');
+  });
+
+  test('列15 タグバッジの内部では文字を改行しない', async ({ signedIn, users }) => {
+    const category = await seedCategory({ name: '交通費' });
+    const tag = await seedTag('家族で長距離旅行');
+    const occurredOn = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' });
+    await seedTransaction({
+      categoryId: category,
+      ownerId: users.taro,
+      payerId: users.taro,
+      createdBy: users.taro,
+      occurredOn,
+      amount: 1280,
+      splits: [{ userId: users.taro, amount: 1280 }],
+      tagIds: [tag],
+    });
+
+    await signedIn.setViewportSize({ width: 375, height: 800 });
+    await signedIn.goto('/transactions');
+    await expect(signedIn.getByText('家族で長距離旅行', { exact: true })).toHaveCSS(
+      'white-space',
+      'nowrap',
+    );
+
+    await signedIn.goto('/new');
+    await expect(signedIn.getByText('家族で長距離旅行', { exact: true })).toHaveCSS(
+      'white-space',
+      'nowrap',
+    );
   });
 
   test('列9 削除を押すとまず確認ダイアログが出て、その時点では消えない', async ({

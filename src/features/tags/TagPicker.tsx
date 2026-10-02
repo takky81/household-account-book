@@ -3,7 +3,7 @@ import type { Tag } from '../../lib/db';
 export function TagBadge({ tag }: { tag: Pick<Tag, 'name' | 'color'> }) {
   return (
     <span
-      className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs"
+      className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs whitespace-nowrap"
       style={{ borderColor: tag.color, color: tag.color }}
     >
       {tag.name}
@@ -31,7 +31,7 @@ export function TagPicker({
         return (
           <label
             key={tag.id}
-            className="flex cursor-pointer items-center gap-1 rounded-full border px-2 py-1 text-xs"
+            className="flex cursor-pointer items-center gap-1 rounded-full border px-2 py-1 text-xs whitespace-nowrap"
             style={{ borderColor: checked ? tag.color : 'var(--c-edge)' }}
           >
             <input
