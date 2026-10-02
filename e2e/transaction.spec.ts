@@ -309,12 +309,41 @@ test.describe('取引の入力と編集', () => {
     await expect(signedIn.getByText('= 1,260')).toBeVisible();
   });
 
+  test('列16 スマホでは数字と演算子を電卓キーボードから入力できる', async ({ signedIn }) => {
+    await signedIn.setViewportSize({ width: 390, height: 844 });
+    await seedCategory({ name: 'スマホ入力' });
+
+    await signedIn.goto('/new');
+    await chooseCategory(signedIn, 'スマホ入力');
+    const amount = signedIn.getByRole('textbox', { name: '金額', exact: true });
+    await amount.click();
+
+    const keypad = signedIn.getByRole('region', { name: '金額の電卓キーボード' });
+    await expect(keypad).toBeVisible();
+    await expect(amount).toHaveAttribute('readonly', '');
+    await expect(amount).toHaveAttribute('inputmode', 'none');
+
+    for (const key of ['1', '2', '0', '0', '＋', '8', '0', '0']) {
+      await keypad.getByRole('button', { name: key, exact: true }).click();
+    }
+    await expect(amount).toHaveValue('1200+800');
+    await expect(signedIn.getByText('= 2,000')).toBeVisible();
+
+    await keypad.getByRole('button', { name: '1文字削除' }).click();
+    await expect(amount).toHaveValue('1200+80');
+    await keypad.getByRole('button', { name: 'クリア' }).click();
+    await expect(amount).toHaveValue('');
+
+    await keypad.getByRole('button', { name: '完了' }).click();
+    await expect(keypad).toBeHidden();
+  });
+
   test('列16 小数をそのまま打つと四捨五入して保存される', async ({ signedIn }) => {
     await seedCategory({ name: '日用品' });
 
     await signedIn.goto('/new');
     await chooseCategory(signedIn, '日用品');
-    // iPhone の数字キーボードには演算子が無いので、小数点だけで税込を打てるようにしてある
+    // 広い画面では物理キーボードから小数点を入力できる
     await signedIn.getByLabel('金額').fill('1980.5');
     await expect(signedIn.getByText('= 1,981（四捨五入）')).toBeVisible();
 

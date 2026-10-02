@@ -82,6 +82,10 @@
       .tabs { display: flex; gap: 4px; }
       .tab { border: 1px solid var(--c-edge); border-radius: 999px; padding: 3px 10px; font-size: 11px; background: var(--c-panel); }
       .tab.on { background: var(--c-ink); color: var(--c-paper); border-color: var(--c-ink); }
+      .keypad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+      .keypad .btn { min-height: 38px; padding: 7px; font-size: 16px; font-weight: bold; }
+      .keypad .utility { background: var(--c-subtle); color: var(--c-ink); border-color: var(--c-line); }
+      .keypad .zero { grid-column: span 2; }
       .tag { border-radius: 999px; padding: 1px 8px; font-size: 11px; white-space: nowrap; }
       .tag.shared { background: var(--c-shared-panel); color: var(--c-shared); }
       .tag.own { background: var(--c-own-panel); color: var(--c-own); }
@@ -231,6 +235,18 @@
           <div class="field"><label class="required">カテゴリ</label><div class="input">食費 / 外食⌄</div></div>
 
           <div class="field"><label class="required">金額</label><div class="input amount" style="font-size: 20px">4,200</div></div>
+
+          <div class="card col">
+            <div class="row"><strong>金額を計算</strong><span class="btn ghost small">完了</span></div>
+            <div class="keypad">
+              <span class="btn utility">C</span><span class="btn utility">(</span><span class="btn utility">)</span><span class="btn utility">⌫</span>
+              <span class="btn ghost">7</span><span class="btn ghost">8</span><span class="btn ghost">9</span><span class="btn">÷</span>
+              <span class="btn ghost">4</span><span class="btn ghost">5</span><span class="btn ghost">6</span><span class="btn">×</span>
+              <span class="btn ghost">1</span><span class="btn ghost">2</span><span class="btn ghost">3</span><span class="btn">−</span>
+              <span class="btn ghost zero">0</span><span class="btn ghost">.</span><span class="btn">＋</span>
+            </div>
+            <div class="note">スマホではネイティブキーボードを出さず、この電卓キーボードを画面下部に固定する</div>
+          </div>
 
           <div class="field">
             <label>支払者</label>
