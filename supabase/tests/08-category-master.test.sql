@@ -6,7 +6,7 @@
 -- category_usage() が影響の件数を返し、画面が保存前に見せて確かめる。
 -- 決定表: カテゴリの管理 列22・列23・列25・列26
 begin;
-select plan(13);
+select plan(18);
 
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
 values
@@ -96,6 +96,38 @@ select throws_ok(
 select lives_ok(
   $$ update public.categories set is_archived = true where id = (select id from food) $$,
   '列23 代わりにアーカイブはできる'
+);
+
+-- 列34・列35 入力候補の表示設定はカテゴリの参照権限やアーカイブとは分ける
+insert into public.categories (kind, name, is_visible_to_all)
+values ('expense', 'pg-自分用', false);
+select is(
+  (select is_visible_to_all from public.categories where name = 'pg-自分用'),
+  false, '列35 作成時に自分だけ表示を指定できる'
+);
+select lives_ok(
+  $$ insert into public.category_visibility_preferences (category_id, user_id, is_visible)
+     select id, '11111111-1111-1111-1111-111111111111', false
+       from public.categories where name = 'pg-自分用' $$,
+  '列34 自分の入力候補を非表示にできる'
+);
+select is(
+  (select is_archived from public.categories where name = 'pg-自分用'),
+  false, '列34 非表示にしてもアーカイブにはならない'
+);
+
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+select is(
+  (select count(*)::int from public.category_visibility_preferences),
+  0, '列34 他の利用者の入力候補設定は見えない'
+);
+
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+select throws_ok(
+  $$ insert into public.category_visibility_preferences (category_id, user_id, is_visible)
+     select id, '11111111-1111-1111-1111-111111111111', false
+       from public.categories where is_system and kind = 'expense' $$,
+  '42501', null, '未分類は非表示にできない'
 );
 
 -- 未分類は全体で1つ。改名も削除もできない

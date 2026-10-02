@@ -12,7 +12,7 @@ import type { ExportTx } from '../transfer/export';
  * CategoryLike（name.ts / move.ts / usage.ts が使う）はこの形の部分集合なので、
  * 変換はこれ1つでよい。
  */
-export function toTreeCategory(category: Category): TreeCategory {
+export function toTreeCategory(category: Category, isHidden = false): TreeCategory {
   return {
     id: category.id,
     parentId: category.parent_id,
@@ -21,6 +21,7 @@ export function toTreeCategory(category: Category): TreeCategory {
     sortOrder: category.sort_order,
     isSystem: category.is_system,
     isArchived: category.is_archived,
+    isHidden,
   };
 }
 

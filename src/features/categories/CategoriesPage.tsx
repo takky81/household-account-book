@@ -17,6 +17,7 @@ import {
   ConfirmDialog,
   ErrorText,
   Field,
+  FieldGroup,
   Note,
   Select,
   Tabs,
@@ -27,6 +28,7 @@ import {
   deleteCategory,
   loadCategoryUsage,
   reparentCategory,
+  setCategoryVisibility,
   updateCategory,
   type Category,
   type CategoryUsage,
@@ -76,6 +78,7 @@ type RowActions = {
   remove: (categoryId: string) => void;
   reparent: (category: Category, parentId: string | null) => void;
   update: (categoryId: string, patch: { color?: string; is_archived?: boolean }) => void;
+  visibility: (categoryId: string, visible: boolean) => void;
 };
 
 /** 一覧の1行。小分類は親の下にぶら下げて見せる（§3.4.1） */
@@ -85,12 +88,14 @@ function CategoryRow({
   parentOptions,
   actions,
   narrow,
+  visible,
 }: {
   category: Category;
   siblings: Category[];
   parentOptions: Category[];
   actions: RowActions;
   narrow: boolean;
+  visible: boolean;
 }) {
   const index = siblings.findIndex((c) => c.id === category.id);
   const isChild = category.parent_id !== null;
@@ -143,6 +148,20 @@ function CategoryRow({
       }}
     >
       {category.is_archived ? '戻す' : 'アーカイブ'}
+    </button>
+  );
+
+  const visibilityButton = (
+    <button
+      type="button"
+      aria-label={`${category.name}を${visible ? '非表示' : '表示'}`}
+      className={narrow ? 'min-h-11 w-full px-2 text-left' : undefined}
+      onClick={() => {
+        setMenuOpen(false);
+        actions.visibility(category.id, !visible);
+      }}
+    >
+      {visible ? '非表示' : '表示'}
     </button>
   );
 
@@ -218,6 +237,7 @@ function CategoryRow({
         {category.is_archived && (
           <span className="ml-1 text-xs text-[var(--c-muted)]">アーカイブ済み</span>
         )}
+        {!visible && <span className="ml-1 text-xs text-[var(--c-muted)]">非表示</span>}
         {category.is_system && (
           <span className="ml-1 text-xs text-[var(--c-muted)]">（消せない）</span>
         )}
@@ -245,6 +265,7 @@ function CategoryRow({
                   {parentSelect}
                 </label>
                 <div className="border-t border-[var(--c-line)]" />
+                {visibilityButton}
                 {archiveButton}
                 {removeButton}
               </div>
@@ -253,6 +274,7 @@ function CategoryRow({
         ) : (
           <span className="flex shrink-0 items-center gap-1 text-xs">
             {parentSelect}
+            {visibilityButton}
             {archiveButton}
             {removeButton}
           </span>
@@ -292,6 +314,7 @@ export function CategoriesPage() {
   const [kind, setKind] = useState<Kind>('expense');
   const [name, setName] = useState('');
   const [parentId, setParentId] = useState<string>(ROOT);
+  const [initialVisibility, setInitialVisibility] = useState<'self' | 'all'>('all');
   const [error, setError] = useState('');
   const [confirm, setConfirm] = useState<RenameConfirm | null>(null);
   const [reparenting, setReparenting] = useState<ReparentConfirm | null>(null);
@@ -453,6 +476,7 @@ export function CategoriesPage() {
         // 表示順は同じ親の中で決まる（§3.4）
         sortOrder: nextSortOrder(siblingsOf(workspace.tree, target)),
         parentId: parent,
+        visibleToAll: initialVisibility === 'all',
       });
       setName('');
       await workspace.reload();
@@ -493,6 +517,16 @@ export function CategoriesPage() {
           await workspace.reload();
         } catch (failure) {
           setError(failure instanceof Error ? failure.message : '変えられませんでした');
+        }
+      })(),
+    visibility: (categoryId, visible) =>
+      void (async () => {
+        setError('');
+        try {
+          await setCategoryVisibility(categoryId, visible);
+          await workspace.reload();
+        } catch (failure) {
+          setError(failure instanceof Error ? failure.message : '表示を変えられませんでした');
         }
       })(),
   };
@@ -536,6 +570,17 @@ export function CategoriesPage() {
         <Field label="名前">
           <TextInput aria-label="カテゴリ名" value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
+        <FieldGroup label="入力候補の初期表示">
+          <Tabs
+            label="入力候補の初期表示"
+            value={initialVisibility}
+            onChange={setInitialVisibility}
+            options={[
+              { value: 'self', label: '自分だけ表示' },
+              { value: 'all', label: '全員表示' },
+            ]}
+          />
+        </FieldGroup>
         <Button onClick={() => void add()}>追加</Button>
       </Card>
 
@@ -587,6 +632,7 @@ export function CategoriesPage() {
                 parentOptions={parentOptions.filter((candidate) => candidate.id !== root.id)}
                 actions={actions}
                 narrow={narrow}
+                visible={workspace.isCategoryVisible(root.id)}
               />
               {childRows.map((child) => (
                 <CategoryRow
@@ -596,6 +642,7 @@ export function CategoriesPage() {
                   parentOptions={parentOptions}
                   actions={actions}
                   narrow={narrow}
+                  visible={workspace.isCategoryVisible(child.id)}
                 />
               ))}
             </div>
@@ -616,8 +663,9 @@ export function CategoriesPage() {
       <Note>
         カテゴリは全員で共有します。改名も並べ替えも誰でもできますが、他の人が使っている
         カテゴリの改名や親の変更は、その人たちの記録の見出しや集計も変えるため確認します。
-        削除は自分しか使っていないときだけです。代わりにアーカイブすると、記録を残したまま
-        新規の選択肢から外せます。カテゴリは2段まで分けられ、小分類を削除するとその取引は親へ、
+        「非表示」は自分の入力候補だけから外します。削除は自分しか使っていないときだけです。
+        代わりにアーカイブすると、記録を残したまま全員の新規選択肢から外せます。
+        カテゴリは2段まで分けられ、小分類を削除するとその取引は親へ、
         大分類を削除すると同じ収支区分の未分類へ移ります
       </Note>
     </main>

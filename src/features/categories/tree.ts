@@ -17,6 +17,8 @@ export type TreeCategory = {
   sortOrder: number;
   isSystem: boolean;
   isArchived: boolean;
+  /** 現在の利用者の入力候補で非表示か。カテゴリの参照・集計には影響しない。 */
+  isHidden?: boolean;
 };
 
 /** 表示順。昇順、同値なら名前順（DB の読み出しと揃える。§3.4） */
@@ -68,13 +70,13 @@ export function siblingsOf<T extends TreeCategory>(categories: T[], target: Sibl
 
 /**
  * 新規入力の候補に出すか（列8・列22）。
- * 親がアーカイブ済みなら、子の is_archived が false でも候補から外す。
+ * 親がアーカイブ済みまたは現在の利用者に非表示なら、子自身の状態にかかわらず候補から外す。
  */
 export function isSelectable(categories: TreeCategory[], category: TreeCategory): boolean {
-  if (category.isArchived) return false;
+  if (category.isArchived || category.isHidden) return false;
   if (category.parentId === null) return true;
   const parent = categories.find((c) => c.id === category.parentId);
-  return parent !== undefined && !parent.isArchived;
+  return parent !== undefined && !parent.isArchived && !parent.isHidden;
 }
 
 /** 大分類の直後にその小分類が並ぶ順（画面・選択肢の共通の並び）。 */

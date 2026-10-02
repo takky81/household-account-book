@@ -125,6 +125,7 @@ export async function seedCategory(input: {
   /** 小分類にするときの親。収支区分は親からコピーされる */
   parentId?: string | null;
   sortOrder?: number;
+  visibleToAll?: boolean;
 }): Promise<string> {
   const { data, error } = await adminClient()
     .from('categories')
@@ -133,6 +134,7 @@ export async function seedCategory(input: {
       name: input.name,
       parent_id: input.parentId ?? null,
       sort_order: input.sortOrder ?? 10,
+      is_visible_to_all: input.visibleToAll ?? true,
     })
     .select('id')
     .single();

@@ -127,7 +127,7 @@ export function SettingsPage() {
           >
             <option value="">選ばない</option>
             {workspace.categories
-              .filter((c) => !c.is_archived)
+              .filter((c) => !c.is_archived && workspace.isCategoryVisible(c.id))
               .map((c) => (
                 <option key={c.id} value={c.id}>
                   {workspace.categoryPath(c.id)}

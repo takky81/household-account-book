@@ -1,4 +1,5 @@
-import { test, expect, confirmDialog } from './fixtures';
+import { test, expect, confirmDialog, signIn } from './fixtures';
+import { HANA } from './env';
 import {
   adminClient,
   countBudgets,
@@ -104,6 +105,91 @@ test.describe('カテゴリの管理', () => {
     await expect(signedIn.getByText('古い取引')).toBeVisible();
     await signedIn.goto('/aggregate');
     await expect(signedIn.getByText('趣味')).toBeVisible();
+  });
+
+  test('列34 非表示にすると自分の入力候補だけから外れ、集計には残る', async ({
+    signedIn,
+    users,
+  }) => {
+    const category = await seedCategory({ name: '趣味' });
+    await seedTransaction({
+      categoryId: category,
+      ownerId: users.taro,
+      payerId: users.taro,
+      createdBy: users.taro,
+      occurredOn: today(),
+      amount: 500,
+      memo: '趣味の支出',
+      splits: [{ userId: users.taro, amount: 500 }],
+    });
+
+    await signedIn.goto('/categories');
+    await signedIn.getByLabel('趣味を非表示').click();
+    await expect(signedIn.getByLabel('趣味を表示')).toBeVisible();
+
+    await signedIn.goto('/new');
+    await signedIn.getByRole('button', { name: 'カテゴリ', exact: true }).click();
+    await expect(
+      signedIn
+        .getByRole('menu', { name: 'カテゴリの選択肢' })
+        .getByRole('menuitem', { name: '趣味', exact: true }),
+    ).toHaveCount(0);
+
+    await signedIn.goto('/aggregate');
+    await expect(signedIn.getByText('趣味', { exact: true })).toBeVisible();
+
+    // 非表示は本人だけ。他の利用者の入力候補は変えない。
+    await signedIn.goto('/settings');
+    await signedIn.getByRole('button', { name: 'ログアウト' }).click();
+    await signIn(signedIn, HANA);
+    await signedIn.goto('/new');
+    await signedIn.getByRole('button', { name: 'カテゴリ', exact: true }).click();
+    await expect(
+      signedIn
+        .getByRole('menu', { name: 'カテゴリの選択肢' })
+        .getByRole('menuitem', { name: '趣味', exact: true }),
+    ).toBeVisible();
+  });
+
+  test('列35 追加時に自分だけ表示か全員表示かを選べる', async ({ signedIn }) => {
+    await signedIn.goto('/categories');
+    const visibility = signedIn.getByRole('group', { name: '入力候補の初期表示' });
+
+    await visibility.getByRole('button', { name: '自分だけ表示' }).click();
+    await signedIn.getByLabel('カテゴリ名').fill('自分用');
+    await signedIn.getByRole('button', { name: '追加' }).click();
+
+    await visibility.getByRole('button', { name: '全員表示' }).click();
+    await signedIn.getByLabel('カテゴリ名').fill('全員用');
+    await signedIn.getByRole('button', { name: '追加' }).click();
+
+    await signedIn.goto('/new');
+    await signedIn.getByRole('button', { name: 'カテゴリ', exact: true }).click();
+    let menu = signedIn.getByRole('menu', { name: 'カテゴリの選択肢' });
+    await expect(menu.getByRole('menuitem', { name: '自分用', exact: true })).toBeVisible();
+    await expect(menu.getByRole('menuitem', { name: '全員用', exact: true })).toBeVisible();
+
+    await signedIn.goto('/settings');
+    await signedIn.getByRole('button', { name: 'ログアウト' }).click();
+    await signIn(signedIn, HANA);
+
+    await signedIn.goto('/new');
+    await signedIn.getByRole('button', { name: 'カテゴリ', exact: true }).click();
+    menu = signedIn.getByRole('menu', { name: 'カテゴリの選択肢' });
+    await expect(menu.getByRole('menuitem', { name: '自分用', exact: true })).toHaveCount(0);
+    await expect(menu.getByRole('menuitem', { name: '全員用', exact: true })).toBeVisible();
+
+    // 初期値が自分だけでも、別の利用者が自分の候補へ表示できる。
+    await signedIn.goto('/categories');
+    await signedIn.getByLabel('自分用を表示').click();
+    await expect(signedIn.getByLabel('自分用を非表示')).toBeVisible();
+    await signedIn.goto('/new');
+    await signedIn.getByRole('button', { name: 'カテゴリ', exact: true }).click();
+    await expect(
+      signedIn
+        .getByRole('menu', { name: 'カテゴリの選択肢' })
+        .getByRole('menuitem', { name: '自分用', exact: true }),
+    ).toBeVisible();
   });
 
   test('列9 削除すると取引が未分類へ移り予算は消える', async ({ signedIn, users }) => {

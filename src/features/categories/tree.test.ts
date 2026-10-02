@@ -18,6 +18,7 @@ const make = (over: Partial<TreeCategory> & { id: string }): TreeCategory => ({
   sortOrder: 10,
   isSystem: false,
   isArchived: false,
+  isHidden: false,
   ...over,
 });
 
@@ -78,6 +79,20 @@ describe('isSelectable', () => {
     const rows = [食費, { ...外食, isArchived: true }, 自炊];
     expect(isSelectable(rows, rows[1]!)).toBe(false);
     expect(isSelectable(rows, 自炊)).toBe(true);
+  });
+
+  it('列34 自分が非表示にしたカテゴリは候補から外れる', () => {
+    const rows = [食費, { ...日用品, isHidden: true }, 未分類];
+    expect(isSelectable(rows, rows[1]!)).toBe(false);
+    expect(isSelectable(rows, 食費)).toBe(true);
+  });
+
+  it('列36 親が非表示なら小分類も候補から外れる', () => {
+    const 親 = { ...食費, isHidden: true };
+    const rows = [親, 外食, 自炊, 日用品, 未分類];
+    expect(isSelectable(rows, 親)).toBe(false);
+    expect(isSelectable(rows, 外食)).toBe(false);
+    expect(isSelectable(rows, 日用品)).toBe(true);
   });
 
   it('selectableCategories は候補だけをツリー順で返す', () => {

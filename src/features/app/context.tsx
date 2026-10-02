@@ -81,6 +81,8 @@ export type WorkspaceState = Workspace & {
   tree: TreeCategory[];
   /** 表示名。小分類は『大分類 / 小分類』（§3.4.1） */
   categoryPath: (id: string) => string;
+  /** 現在の利用者の入力候補に表示するカテゴリか。 */
+  isCategoryVisible: (id: string) => boolean;
   /** 起動時、または手で実行した定期登録の結果（§5.8）。まだ実行していなければ null */
   recurringResult: RecurringRunResult | null;
   /** 定期登録を今すぐ実行する（設定画面の手動実行） */
@@ -89,7 +91,14 @@ export type WorkspaceState = Workspace & {
 
 const WorkspaceContext = createContext<WorkspaceState | null>(null);
 
-const empty: Workspace = { profiles: [], groups: [], members: [], categories: [], tags: [] };
+const empty: Workspace = {
+  profiles: [],
+  groups: [],
+  members: [],
+  categories: [],
+  categoryVisibilityPreferences: [],
+  tags: [],
+};
 
 export function WorkspaceProvider({ children, userId }: { children: ReactNode; userId: string }) {
   const [data, setData] = useState<Workspace>(empty);
@@ -138,7 +147,19 @@ export function WorkspaceProvider({ children, userId }: { children: ReactNode; u
           sortOrder: m.sort_order,
         }));
 
-    const tree = data.categories.map(toTreeCategory);
+    const visibilityByCategory = new Map(
+      data.categoryVisibilityPreferences.map((preference) => [
+        preference.category_id,
+        preference.is_visible,
+      ]),
+    );
+    const isCategoryVisible = (category: (typeof data.categories)[number]) =>
+      category.is_system ||
+      (visibilityByCategory.get(category.id) ??
+        (category.is_visible_to_all || category.created_by === userId));
+    const tree = data.categories.map((category) =>
+      toTreeCategory(category, !isCategoryVisible(category)),
+    );
     const byId = new Map(tree.map((c) => [c.id, c]));
 
     return {
@@ -149,6 +170,10 @@ export function WorkspaceProvider({ children, userId }: { children: ReactNode; u
       categoryPath: (id) => {
         const found = byId.get(id);
         return found === undefined ? '' : categoryPath(tree, found);
+      },
+      isCategoryVisible: (id) => {
+        const category = data.categories.find((candidate) => candidate.id === id);
+        return category !== undefined && isCategoryVisible(category);
       },
       recurringResult,
       runRecurring,

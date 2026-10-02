@@ -30,6 +30,7 @@ export type GroupMember = {
 /** 全ユーザー共通のカテゴリ（§3.4）。共有範囲は持たない（取引・予算・ルールの側にある） */
 export type Category = {
   id: string;
+  created_by: string | null;
   /** 親カテゴリ。null なら大分類（§3.4.1） */
   parent_id: string | null;
   kind: Kind;
@@ -38,6 +39,14 @@ export type Category = {
   sort_order: number;
   is_system: boolean;
   is_archived: boolean;
+  /** 入力候補の初期表示。false は作成者だけ、true は全員。 */
+  is_visible_to_all: boolean;
+};
+
+export type CategoryVisibilityPreference = {
+  category_id: string;
+  user_id: string;
+  is_visible: boolean;
 };
 
 /** 全ユーザー共通のタグ。カテゴリと異なり収支区分や階層を持たない。 */
@@ -125,6 +134,7 @@ export type Workspace = {
   groups: ShareGroup[];
   members: GroupMember[];
   categories: Category[];
+  categoryVisibilityPreferences: CategoryVisibilityPreference[];
   tags: Tag[];
 };
 
@@ -135,11 +145,12 @@ function unwrap<T>(result: { data: T | null; error: { message: string } | null }
 }
 
 export async function loadWorkspace(): Promise<Workspace> {
-  const [profiles, groups, members, categories, tags] = await Promise.all([
+  const [profiles, groups, members, categories, categoryVisibilityPreferences, tags] = await Promise.all([
     supabase.from('profiles').select('id, display_name, color, default_category_id'),
     supabase.from('share_groups').select('id, name').order('name'),
     supabase.from('share_group_members').select('*').order('sort_order'),
     supabase.from('categories').select('*').order('sort_order').order('name'),
+    supabase.from('category_visibility_preferences').select('category_id, user_id, is_visible'),
     supabase.from('tags').select('*').order('sort_order').order('name'),
   ]);
   return {
@@ -147,6 +158,9 @@ export async function loadWorkspace(): Promise<Workspace> {
     groups: unwrap(groups) as ShareGroup[],
     members: unwrap(members) as GroupMember[],
     categories: unwrap(categories) as Category[],
+    categoryVisibilityPreferences: unwrap(
+      categoryVisibilityPreferences,
+    ) as CategoryVisibilityPreference[],
     tags: unwrap(tags) as Tag[],
   };
 }
@@ -341,6 +355,8 @@ export async function createCategory(input: {
   sortOrder: number;
   /** 小分類として作るときの親。収支区分は親からコピーされる（§3.4.1） */
   parentId?: string | null;
+  /** 入力候補を全員へ初期表示するか。CSV取り込みなどは従来どおり全員表示。 */
+  visibleToAll?: boolean;
 }): Promise<void> {
   // created_by / is_system は既定値とトリガが入れる（列を grant していない）
   const { error } = await supabase.from('categories').insert({
@@ -349,6 +365,7 @@ export async function createCategory(input: {
     color: input.color,
     sort_order: input.sortOrder,
     parent_id: input.parentId ?? null,
+    is_visible_to_all: input.visibleToAll ?? true,
   });
   if (error !== null) throw new Error(error.message);
 }
@@ -380,6 +397,21 @@ export async function updateCategory(
   patch: { name?: string; color?: string; sort_order?: number; is_archived?: boolean },
 ): Promise<void> {
   const { error } = await supabase.from('categories').update(patch).eq('id', id);
+  if (error !== null) throw new Error(error.message);
+}
+
+/** 自分の入力候補にカテゴリを表示するかを上書きする。カテゴリ本体の公開範囲は変えない。 */
+export async function setCategoryVisibility(categoryId: string, isVisible: boolean): Promise<void> {
+  const userId = (await supabase.auth.getUser()).data.user?.id;
+  if (userId === undefined) throw new Error('ログインが必要です');
+  const { error } = await supabase.from('category_visibility_preferences').upsert(
+    {
+      category_id: categoryId,
+      user_id: userId,
+      is_visible: isVisible,
+    },
+    { onConflict: 'category_id,user_id' },
+  );
   if (error !== null) throw new Error(error.message);
 }
 
